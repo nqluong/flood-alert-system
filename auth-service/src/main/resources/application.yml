@@ -1,0 +1,31 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: "jdbc:${DB_URL_AUTH}"
+    username: ${DB_USERNAME_AUTH}
+    password: ${DB_PASSWORD_AUTH}
+    driver-class-name: "org.postgresql.Driver"
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: auth
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          secret-key: "${SECRET_KEY_JWT}"
+
+
+jwt:
+#  secret-key: "${SECRET_KEY_JWT}"
+  issuer: flood-alert-auth-service
+  access-token-expiration: 3600 # 24 hours
+  refresh-token-expiration: 604800 # 7 days
