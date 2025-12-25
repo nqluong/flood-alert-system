@@ -6,10 +6,13 @@ import lombok.RequiredArgsConstructor;
 import org.project.floodalert.auth.dto.request.LoginRequest;
 import org.project.floodalert.auth.dto.request.RefreshTokenRequest;
 import org.project.floodalert.auth.dto.request.RegisterRequest;
+import org.project.floodalert.auth.dto.request.VerifyTokenRequest;
 import org.project.floodalert.auth.dto.response.LoginResponse;
 import org.project.floodalert.auth.dto.response.UserResponse;
+import org.project.floodalert.auth.dto.response.VerifyTokenResponse;
 import org.project.floodalert.auth.security.UserPrincipal;
 import org.project.floodalert.auth.service.AuthService;
+import org.project.floodalert.auth.service.TokenVerificationService;
 import org.project.floodalert.auth.utils.HttpRequestUtils;
 import org.project.floodalert.common.dto.response.ApiResponse;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +26,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final TokenVerificationService tokenVerificationService;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<LoginResponse>> login(
@@ -92,5 +96,62 @@ public class AuthController {
         return ResponseEntity.ok(
                 ApiResponse.success(user)
         );
+    }
+
+    @PostMapping("/verify-token")
+    public ResponseEntity<ApiResponse<VerifyTokenResponse>> verifyToken(
+            @Valid @RequestBody VerifyTokenRequest request) {
+
+        VerifyTokenResponse response = tokenVerificationService.verifyToken(request.getToken());
+
+        if (response.isValid()) {
+            return ResponseEntity.ok(
+                    ApiResponse.success("Token hợp lệ", response)
+            );
+        } else {
+            return ResponseEntity.ok(
+                    ApiResponse.<VerifyTokenResponse>builder()
+                            .code(401)
+                            .message(response.getInvalidReason())
+                            .data(response)
+                            .build()
+            );
+        }
+    }
+
+    @GetMapping("/verify")
+    public ResponseEntity<ApiResponse<VerifyTokenResponse>> verifyTokenHeader(
+            @RequestHeader("Authorization") String authHeader) {
+
+        String token = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            token = authHeader.substring(7);
+        }
+
+        if (token == null) {
+            return ResponseEntity.ok(
+                    ApiResponse.<VerifyTokenResponse>builder()
+                            .code(401)
+                            .message("Token không hợp lệ")
+                            .data(VerifyTokenResponse.invalid("Missing token"))
+                            .build()
+            );
+        }
+
+        VerifyTokenResponse response = tokenVerificationService.verifyToken(token);
+
+        if (response.isValid()) {
+            return ResponseEntity.ok(
+                    ApiResponse.success("Token hợp lệ", response)
+            );
+        } else {
+            return ResponseEntity.ok(
+                    ApiResponse.<VerifyTokenResponse>builder()
+                            .code(401)
+                            .message(response.getInvalidReason())
+                            .data(response)
+                            .build()
+            );
+        }
     }
 }
