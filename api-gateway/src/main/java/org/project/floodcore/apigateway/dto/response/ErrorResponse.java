@@ -1,4 +1,4 @@
-package org.project.floodalert.common.dto.response;
+package org.project.floodcore.apigateway.dto.response;
 
 import lombok.*;
 import lombok.experimental.FieldDefaults;

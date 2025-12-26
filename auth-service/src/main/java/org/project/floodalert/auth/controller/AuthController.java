@@ -15,6 +15,7 @@ import org.project.floodalert.auth.service.AuthService;
 import org.project.floodalert.auth.service.TokenVerificationService;
 import org.project.floodalert.auth.utils.HttpRequestUtils;
 import org.project.floodalert.common.dto.response.ApiResponse;
+import org.project.floodalert.common.security.InternalUserDetails;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -88,13 +89,27 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser(Authentication authentication) {
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new RuntimeException("Chưa xác thực");
+        }
 
-        UUID userId = UUID.fromString(principal.getUserId());
+        Object principal = authentication.getPrincipal();
+
+        UUID userId;
+
+        if (principal instanceof InternalUserDetails) {
+            InternalUserDetails userDetails = (InternalUserDetails) principal;
+            userId = UUID.fromString(userDetails.getUserId());
+        } else if (principal instanceof String) {
+            userId = UUID.fromString((String) principal);
+        } else {
+            throw new ClassCastException("Không thể xác định loại User Principal");
+        }
+
         UserResponse user = authService.getCurrentUser(userId);
 
         return ResponseEntity.ok(
-                ApiResponse.success(user)
+                ApiResponse.success("Lấy thông tin bản thân thành công", user)
         );
     }
 
