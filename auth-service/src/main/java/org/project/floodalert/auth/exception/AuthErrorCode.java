@@ -15,6 +15,13 @@ public enum AuthErrorCode implements BaseErrorCode {
     USER_NOT_FOUND(2105, "Không tìm thấy người dùng", HttpStatus.NOT_FOUND),
     EMAIL_ALREADY_EXISTS(2106 ,"Email đã tồn tại", HttpStatus.CONFLICT),
     PHONE_ALREADY_EXISTS(2107, "Số điện thoại đã tồn tại", HttpStatus.CONFLICT),
+
+    ROLE_NOT_FOUND(3001, "Không tìm thấy role", HttpStatus.NOT_FOUND),
+    ROLE_ALREADY_EXISTS(3002, "Role đã tồn tại", HttpStatus.CONFLICT),
+    ROLE_IN_USE(3003, "Role đang được sử dụng, không thể xóa", HttpStatus.CONFLICT),
+    USER_ROLE_NOT_FOUND(3004, "Không tìm thấy phân quyền người dùng", HttpStatus.NOT_FOUND),
+    USER_ROLE_ALREADY_EXISTS(3005, "Người dùng đã có role này", HttpStatus.CONFLICT),
+    INVALID_ROLE_DATA(3006, "Dữ liệu role không hợp lệ", HttpStatus.BAD_REQUEST)
     ;
 
     private final int code;
