@@ -67,7 +67,6 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
 
-
                 .addFilterBefore(internalAuthFilter, UsernamePasswordAuthenticationFilter.class)
 
                 .exceptionHandling(exception -> exception

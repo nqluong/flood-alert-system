@@ -44,7 +44,7 @@ public class UserRoleController {
     @GetMapping("/user/{userId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
     public ResponseEntity<ApiResponse<List<UserRoleResponse>>> getUserRoles(
-            @PathVariable UUID userId) {
+            @PathVariable("userId") UUID userId) {
         List<UserRoleResponse> responses = userRoleService.getUserRoles(userId);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
@@ -52,7 +52,7 @@ public class UserRoleController {
     @GetMapping("/role/{roleId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<UserRoleResponse>>> getRoleUsers(
-            @PathVariable UUID roleId) {
+            @PathVariable("roleId") UUID roleId) {
         List<UserRoleResponse> responses = userRoleService.getRoleUsers(roleId);
         return ResponseEntity.ok(ApiResponse.success(responses));
     }
