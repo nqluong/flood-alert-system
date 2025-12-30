@@ -56,3 +56,16 @@
 1767058538: Opening ipv6 listen socket on port 1883.
 1767058538: Opening websockets listen socket on port 9001.
 1767058538: mosquitto version 2.0.22 running
+1767060338: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767062139: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767063940: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767065741: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767067542: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767069343: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767071143: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767072944: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767074745: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767076546: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767078347: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767080148: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1767081949: Saving in-memory database to /mosquitto/data//mosquitto.db.
