@@ -48,7 +48,6 @@ public class AuthController {
     public ResponseEntity<ApiResponse<UserResponse>> register(
             @Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
 
-
         UserResponse response = authService.register(request, httpRequest);
 
         return ResponseEntity.ok(

@@ -22,36 +22,46 @@ public class AuditLogger {
     private final AuditLogRepository auditLogRepository;
 
     /**
-     * Log user login action
+     * Log successful login action
      */
     @Async
-    public void logLogin(UUID userId, String ipAddress, String userAgent) {
+    public void logLogin(UUID userId, String email, String ipAddress, String userAgent, String loginMethod) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("action_type", "LOGIN");
+        metadata.put("status", "SUCCESS");
+        metadata.put("email", email);
+        metadata.put("login_method", loginMethod != null ? loginMethod : "EMAIL_PASSWORD");
         metadata.put("auth_method", "JWT");
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
-        saveAuditLog(userId, "LOGIN", "USER", userId, ipAddress, userAgent, metadata);
+        saveAuditLog(userId, "LOGIN", "AUTHENTICATION", userId, ipAddress, userAgent, metadata);
     }
 
     /**
      * Log user logout action
      */
     @Async
-    public void logLogout(UUID userId, String ipAddress, String userAgent) {
+    public void logLogout(UUID userId, String email, String ipAddress, String userAgent) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("action_type", "LOGOUT");
+        metadata.put("status", "SUCCESS");
+        metadata.put("email", email);
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
-        saveAuditLog(userId, "LOGOUT", "USER", userId, ipAddress, userAgent, metadata);
+        saveAuditLog(userId, "LOGOUT", "AUTHENTICATION", userId, ipAddress, userAgent, metadata);
     }
 
     /**
      * Log user registration
      */
     @Async
-    public void logUserRegistration(UUID userId, String ipAddress, String userAgent) {
+    public void logUserRegistration(UUID userId, String email, String ipAddress, String userAgent) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("action_type", "USER_REGISTRATION");
+        metadata.put("status", "SUCCESS");
         metadata.put("auth_provider", "LOCAL");
+        metadata.put("email", email);
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
         saveAuditLog(userId, "REGISTER", "USER", userId, ipAddress, userAgent, metadata);
     }
@@ -60,40 +70,70 @@ public class AuditLogger {
      * Log token refresh action
      */
     @Async
-    public void logTokenRefresh(UUID userId, String ipAddress, String userAgent) {
+    public void logTokenRefresh(UUID userId, String email, String ipAddress, String userAgent, boolean success) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("action_type", "TOKEN_REFRESH");
+        metadata.put("status", success ? "SUCCESS" : "FAILED");
+        metadata.put("email", email);
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
-        saveAuditLog(userId, "REFRESH_TOKEN", "USER", userId, ipAddress, userAgent, metadata);
+        saveAuditLog(userId, "REFRESH_TOKEN", "AUTHENTICATION", userId, ipAddress, userAgent, metadata);
     }
 
     /**
      * Log failed login attempt
      */
     @Async
-    public void logFailedLogin(String email, String ipAddress, String userAgent, String reason) {
+    public void logFailedLogin(String email, String ipAddress, String userAgent, String reason, String loginMethod) {
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("action_type", "FAILED_LOGIN");
+        metadata.put("action_type", "LOGIN");
+        metadata.put("status", "FAILED");
         metadata.put("email", email);
         metadata.put("reason", reason);
+        metadata.put("login_method", loginMethod != null ? loginMethod : "EMAIL_PASSWORD");
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
-        saveAuditLog(null, "FAILED_LOGIN", "USER", null, ipAddress, userAgent, metadata);
+        saveAuditLog(null, "FAILED_LOGIN", "AUTHENTICATION", null, ipAddress, userAgent, metadata);
     }
 
     /**
      * Log password change
      */
     @Async
-    public void logPasswordChange(UUID userId, String ipAddress, String userAgent) {
+    public void logPasswordChange(UUID userId, String email, String ipAddress, String userAgent, boolean success) {
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("action_type", "PASSWORD_CHANGE");
+        metadata.put("status", success ? "SUCCESS" : "FAILED");
+        metadata.put("email", email);
+        metadata.put("timestamp", LocalDateTime.now().toString());
 
         saveAuditLog(userId, "PASSWORD_CHANGE", "USER", userId, ipAddress, userAgent, metadata);
     }
 
-    /**
-     * Generic method to save audit log
-     */
+    @Async
+    public void logSuspiciousActivity(UUID userId, String email, String ipAddress, String userAgent, String activity, String details) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("action_type", "SUSPICIOUS_ACTIVITY");
+        metadata.put("activity", activity);
+        metadata.put("details", details);
+        metadata.put("email", email);
+        metadata.put("timestamp", LocalDateTime.now().toString());
+
+        saveAuditLog(userId, "SUSPICIOUS_ACTIVITY", "SECURITY", userId, ipAddress, userAgent, metadata);
+    }
+
+    @Async
+    public void logAccountLockout(UUID userId, String email, String ipAddress, String userAgent, String reason) {
+        Map<String, Object> metadata = new HashMap<>();
+        metadata.put("action_type", "ACCOUNT_LOCKOUT");
+        metadata.put("status", "LOCKED");
+        metadata.put("email", email);
+        metadata.put("reason", reason);
+        metadata.put("timestamp", LocalDateTime.now().toString());
+
+        saveAuditLog(userId, "ACCOUNT_LOCKOUT", "SECURITY", userId, ipAddress, userAgent, metadata);
+    }
+
     private void saveAuditLog(UUID userId, String action, String resourceType,
                               UUID resourceId, String ipAddress, String userAgent,
                               Map<String, Object> metadata) {
@@ -112,11 +152,12 @@ public class AuditLogger {
 
             auditLogRepository.save(auditLog);
 
-            log.debug("Audit log saved: action={}, userId={}, ip={}", action, userId, ipAddress);
+            log.debug("Audit log saved: action={}, userId={}, ip={}, status={}",
+                    action, userId, ipAddress, metadata.get("status"));
 
         } catch (Exception e) {
-            // Don't throw exception to avoid breaking main business logic
-            log.error("Failed to save audit log: action={}, userId={}", action, userId, e);
+            log.error("Failed to save audit log: action={}, userId={}, metadata={}",
+                    action, userId, metadata, e);
         }
     }
 

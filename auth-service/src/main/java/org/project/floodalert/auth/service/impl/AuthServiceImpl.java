@@ -28,6 +28,7 @@ import org.project.floodalert.auth.service.AuthService;
 import org.project.floodalert.auth.service.RoleService;
 import org.project.floodalert.auth.utils.AuditLogger;
 import org.project.floodalert.common.exception.AppException;
+import org.project.floodalert.common.exception.BaseErrorCode;
 import org.project.floodalert.common.exception.ErrorCode;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -35,6 +36,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+
+import static org.project.floodalert.common.exception.ErrorCode.*;
 
 @Slf4j
 @Service
@@ -54,24 +57,51 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
-        User user = findUserByEmail(request.getEmail());
+        User user = null;
+        String loginMethod = null;
 
-        validateUserStatus(user);
-        validateAuthProvider(user);
-        validatePassword(request.getPassword(), user.getPasswordHash());
+        try {
+            if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+                loginMethod = "EMAIL";
+                user = findUserByEmail(request.getEmail());
+            } else if (request.getPhoneNumber() != null && !request.getPhoneNumber().trim().isEmpty()) {
+                loginMethod = "PHONE";
+                user = userRepository.findByPhone(request.getPhoneNumber())
+                        .orElseThrow(() -> new AppException(INVALID_CREDENTIALS));
+            }
 
-        List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
+            // Validate user
+            validateUserStatus(user);
+            validateAuthProvider(user);
+            validatePassword(request.getPassword(), user.getPasswordHash());
 
-        String accessToken = jwtTokenGenerator.generateAccessToken(user, roles);
-        String refreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
+            // Generate tokens
+            List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
+            String accessToken = jwtTokenGenerator.generateAccessToken(user, roles);
+            String refreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
 
-        updateLastLogin(user);
+            // Update last login
+            updateLastLogin(user);
 
-//        auditLogger.logLogin(user.getId(), ipAddress, userAgent);
+            // Log successful login
+            auditLogger.logLogin(user.getId(), user.getEmail(), ipAddress, userAgent, loginMethod);
 
-        log.info("User logged in successfully: {}", user.getEmail());
+            log.info("User logged in successfully: email={}, method={}, ip={}",
+                    user.getEmail(), loginMethod, ipAddress);
 
-        return buildLoginResponse(accessToken, refreshToken, user, roles);
+            return buildLoginResponse(accessToken, refreshToken, user, roles);
+
+        } catch (AppException e) {
+            String email = request.getEmail() != null ? request.getEmail() : request.getPhoneNumber();
+            String reason = determineFailureReason(e.getErrorCode());
+
+            auditLogger.logFailedLogin(email, ipAddress, userAgent, reason, loginMethod);
+
+            log.warn("Login failed: email/phone={}, reason={}, ip={}",
+                    email, reason, ipAddress);
+
+            throw e;
+        }
     }
 
     @Override
@@ -100,12 +130,6 @@ public class AuthServiceImpl implements AuthService {
 
         assignDefaultRole(savedUser.getId());
 
-        auditLogger.logUserRegistration(
-                savedUser.getId(),
-                getClientIp(httpRequest),
-                httpRequest.getHeader("User-Agent")
-        );
-
         log.info("New user registered successfully: {}", savedUser.getEmail());
 
         List<String> roles = List.of("USER");
@@ -117,37 +141,65 @@ public class AuthServiceImpl implements AuthService {
 
         String refreshTokenStr = request.getRefreshToken();
 
-        // Validate refresh token
-        if (!jwtTokenValidator.validateToken(refreshTokenStr)) {
-            throw new AppException(ErrorCode.INVALID_TOKEN, "Refresh token không hợp lệ");
+        try {
+            // Validate refresh token
+            if (!jwtTokenValidator.validateToken(refreshTokenStr)) {
+                throw new AppException(ErrorCode.INVALID_TOKEN, "Refresh token không hợp lệ");
+            }
+
+            String tokenType = jwtTokenValidator.getTokenType(refreshTokenStr);
+            if (!"refresh_token".equals(tokenType)) {
+                throw new AppException(ErrorCode.INVALID_TOKEN, "Token type không đúng");
+            }
+
+            UUID userId = jwtTokenValidator.getUserIdFromToken(refreshTokenStr);
+            User user = findUserById(userId);
+            validateUserStatus(user);
+
+            invalidateToken(refreshTokenStr, userId, "TOKEN_REFRESH", null, null);
+
+            // Generate new tokens
+            List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
+            String newAccessToken = jwtTokenGenerator.generateAccessToken(user, roles);
+            String newRefreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
+
+            auditLogger.logTokenRefresh(userId, user.getEmail(), null, null, true);
+
+            log.info("Token refreshed successfully: userId={}", userId);
+
+            return buildLoginResponse(newAccessToken, newRefreshToken, user, roles);
+
+        } catch (Exception e) {
+            try {
+                UUID userId = jwtTokenValidator.getUserIdFromToken(refreshTokenStr);
+                User user = findUserById(userId);
+                auditLogger.logTokenRefresh(userId, user.getEmail(), null, null, false);
+            } catch (Exception ex) {
+                log.error("Could not log failed token refresh", ex);
+            }
+
+            throw e;
         }
-        String tokenType = jwtTokenValidator.getTokenType(refreshTokenStr);
-        if (!"refresh_token".equals(tokenType)) {
-            throw new AppException(ErrorCode.INVALID_TOKEN, "Token type không đúng");
-        }
-
-        UUID userId = jwtTokenValidator.getUserIdFromToken(refreshTokenStr);
-        User user = findUserById(userId);
-        validateUserStatus(user);
-
-        invalidateToken(refreshTokenStr, userId, "TOKEN_REFRESH", null, null);
-
-
-        List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
-        String newAccessToken = jwtTokenGenerator.generateAccessToken(user, roles);
-        String newRefreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
-
-        return buildLoginResponse(newAccessToken, newRefreshToken, user, roles);
     }
 
     @Override
     public void logout(String refreshTokenStr, UUID userId, String ipAddress, String userAgent) {
+        try {
+            User user = findUserById(userId);
 
-        invalidateToken(refreshTokenStr, userId, "USER_LOGOUT", ipAddress, userAgent);
+            // Invalidate token
+            invalidateToken(refreshTokenStr, userId, "USER_LOGOUT", ipAddress, userAgent);
 
-        auditLogger.logLogout(userId, ipAddress, userAgent);
+            // Log successful logout
+            auditLogger.logLogout(userId, user.getEmail(), ipAddress, userAgent);
 
-        log.info("User logged out successfully: {}", userId);
+            log.info("User logged out successfully: userId={}, email={}, ip={}",
+                    userId, user.getEmail(), ipAddress);
+
+        } catch (Exception e) {
+            log.error("Error during logout for userId={}", userId, e);
+            throw e;
+        }
     }
 
     @Override
@@ -159,7 +211,7 @@ public class AuthServiceImpl implements AuthService {
 
     private User findUserByEmail(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new AppException(ErrorCode.INVALID_CREDENTIALS));
+                .orElseThrow(() -> new AppException(INVALID_CREDENTIALS));
     }
 
     private User findUserById(UUID userId) {
@@ -169,7 +221,7 @@ public class AuthServiceImpl implements AuthService {
 
     private void validateUserStatus(User user) {
         if (user.getStatus() == UserStatus.DISABLED) {
-            throw new AppException(ErrorCode.ACCOUNT_DISABLED);
+            throw new AppException(ACCOUNT_DISABLED);
         }
         if (user.getStatus() == UserStatus.BANNED) {
             throw new AppException(ErrorCode.ACCOUNT_BANNED);
@@ -179,7 +231,7 @@ public class AuthServiceImpl implements AuthService {
     private void validateAuthProvider(User user) {
         if (user.getAuthProvider() != AuthProvider.LOCAL) {
             throw new AppException(
-                    ErrorCode.WRONG_AUTH_PROVIDER,
+                    WRONG_AUTH_PROVIDER,
                     "Tài khoản này đăng nhập bằng " + user.getAuthProvider().name()
             );
         }
@@ -187,7 +239,7 @@ public class AuthServiceImpl implements AuthService {
 
     private void validatePassword(String rawPassword, String encodedPassword) {
         if (!passwordEncoder.matches(rawPassword, encodedPassword)) {
-            throw new AppException(ErrorCode.INVALID_CREDENTIALS);
+            throw new AppException(INVALID_CREDENTIALS);
         }
     }
 
@@ -276,5 +328,15 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return ip;
+    }
+
+    private String determineFailureReason(BaseErrorCode errorCode) {
+        return switch (errorCode) {
+            case INVALID_CREDENTIALS -> "INVALID_CREDENTIALS";
+            case ACCOUNT_DISABLED -> "ACCOUNT_DISABLED";
+            case ACCOUNT_BANNED -> "ACCOUNT_BANNED";
+            case WRONG_AUTH_PROVIDER -> "WRONG_AUTH_PROVIDER";
+            default -> "UNKNOWN_ERROR";
+        };
     }
 }
