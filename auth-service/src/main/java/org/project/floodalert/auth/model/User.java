@@ -40,6 +40,9 @@ public class User {
     @Column(nullable = false)
     UserStatus status;
 
+    @Column(name = "email_verified")
+    Boolean emailVerified;
+
     @Column(name = "firebase_uid")
     String firebaseUid;
 

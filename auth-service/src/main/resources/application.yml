@@ -29,3 +29,7 @@ jwt:
   issuer: flood-alert-auth-service
   access-token-expiration: 3600 # 24 hours
   refresh-token-expiration: 604800 # 7 days
+
+firebase:
+  config:
+    path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
