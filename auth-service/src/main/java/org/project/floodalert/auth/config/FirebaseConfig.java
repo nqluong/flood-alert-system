@@ -15,7 +15,7 @@ import java.io.InputStream;
 @Slf4j
 @Configuration
 public class FirebaseConfig {
-    @Value("${firebase.config.path:classpath:firebase-service-account.json}")
+    @Value("${firebase.config.path:classpath:firebase-key.json}")
     private Resource firebaseConfigResource;
 
     @Bean

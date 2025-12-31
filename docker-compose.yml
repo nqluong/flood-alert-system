@@ -15,6 +15,7 @@ services:
 
   kafka:
     image: apache/kafka:latest
+    user: root
     hostname: kafka  # Đặt tên host là kafka cho dễ gọi
     container_name: flood-kafka
     restart: unless-stopped
@@ -50,7 +51,7 @@ services:
       KAFKA_NUM_PARTITIONS: 3
 
     volumes:
-      - kafka_data:/tmp/kraft-combined-logs
+      - kafka_data_new:/tmp/kraft-combined-logs
 
     # 4. KAFKA UI
   kafka-ui:
@@ -76,4 +77,4 @@ services:
 
 volumes:
   redis_data:
-  kafka_data:
+  kafka_data_new:
