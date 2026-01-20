@@ -1,22 +1,23 @@
 server:
-  port: 8082
+  port: ${SERVER_PORT:8082}
+
 spring:
   application:
-    name: ingention-service
+    name: ${SPRING_APPLICATION_NAME:ingention-service}
 
 mqtt:
-  borker-url: tcp://localhost:1883
-  client-id: ingention-service-${random.uuid}
-  topic-pattern: floodguard/sensors/+/telemetry
-  qos: 1
-  auto-reconnect: true
+  borker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
+  client-id: ${MQTT_CLIENT_ID:ingention-service}-${random.uuid}
+  topic-pattern: ${MQTT_TOPIC_PATTERN:floodguard/sensors/+/telemetry}
+  qos: ${MQTT_QOS:1}
+  auto-reconnect: ${MQTT_AUTO_RECONNECT:true}
 
 kafka:
-    bootstrap-servers: localhost:9092
-    topic: iot-raw
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      acks: all
-      retries: 3
+  bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  topic: ${KAFKA_TOPIC:iot-raw}
+  producer:
+    key-serializer: ${KAFKA_PRODUCER_KEY_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
+    value-serializer: ${KAFKA_PRODUCER_VALUE_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
+    acks: ${KAFKA_PRODUCER_ACKS:all}
+    retries: ${KAFKA_PRODUCER_RETRIES:3}
 

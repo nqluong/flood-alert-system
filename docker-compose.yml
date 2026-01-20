@@ -25,10 +25,6 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
 
-      # Cấu hình Listeners (Quan trọng)
-      # - CONTROLLER: Dành cho nội bộ Kafka quản lý
-      # - INTERNAL: Dành cho các Service (Java, Kafka UI) chạy trong Docker kết nối
-      # - EXTERNAL: Dành cho máy tính của bạn (Localhost) kết nối
       KAFKA_LISTENERS: PLAINTEXT://:29092,CONTROLLER://:29093,PLAINTEXT_HOST://:9092
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
@@ -37,7 +33,6 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
 
-      # Tự động format ổ đĩa với ID này (Không cần chạy lệnh format tay)
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
 
       # Tối ưu RAM (Quan trọng cho VPS)
@@ -74,6 +69,34 @@ services:
     volumes:
       - redis_data:/data
     command: [ "redis-server", "--appendonly", "yes", "--requirepass", "Nguyenluong1405" ]
+
+  ingestion-service:
+    build:
+      context: .
+      dockerfile: ingestion-service/Dockerfile
+    container_name: flood-ingestion-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_APPLICATION_NAME: ingestion-service
+      MQTT_BROKER_URL: tcp://mqtt-broker:1883
+      MQTT_CLIENT_ID: ingestion-service
+      MQTT_TOPIC_PATTERN: floodguard/sensors/+/telemetry
+      MQTT_QOS: 1
+      MQTT_AUTO_RECONNECT: true
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_TOPIC: iot-raw
+      KAFKA_PRODUCER_KEY_SERIALIZER: org.apache.kafka.common.serialization.StringSerializer
+      KAFKA_PRODUCER_VALUE_SERIALIZER: org.apache.kafka.common.serialization.StringSerializer
+      KAFKA_PRODUCER_ACKS: all
+      KAFKA_PRODUCER_RETRIES: 3
+    depends_on:
+      - mqtt-broker
+      - kafka
+    networks:
+      - default
 
 volumes:
   redis_data:
