@@ -3,3 +3,30 @@ server:
 spring:
   application:
     name: floodcore-service
+  datasource:
+    url: "jdbc:${DB_URL_FLOODCORE}"
+    username: ${DB_USERNAME_FLOODCORE}
+    password: ${DB_PASSWORD_FLOODCORE}
+    driver-class-name: "org.postgresql.Driver"
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 5000
+      lettuce:
+        pool:
+            max-active: 8
+            max-idle: 8
+            min-idle: 0
+            max-wait: -1ms
+
+
