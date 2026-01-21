@@ -6,3 +6,13 @@
 1768986938: mosquitto version 2.0.22 running
 1768986960: mosquitto version 2.0.22 terminating
 1768986960: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1768987032: mosquitto version 2.0.22 starting
+1768987032: Config loaded from /mosquitto/config/mosquitto.conf.
+1768987032: Opening ipv4 listen socket on port 1883.
+1768987032: Opening ipv6 listen socket on port 1883.
+1768987032: Opening websockets listen socket on port 9001.
+1768987032: mosquitto version 2.0.22 running
+1768987051: New connection from 172.23.0.1:41382 on port 1883.
+1768987051: New client connected from 172.23.0.1:41382 as mqtt-explorer-b7063bae (p2, c1, k60).
+1768987066: mosquitto version 2.0.22 terminating
+1768987066: Saving in-memory database to /mosquitto/data//mosquitto.db.
