@@ -22,56 +22,56 @@ public class FloodZone {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
-    UUID ID;
+    UUID id;
 
     @Column(name = "name", nullable = false, length = 255)
-    String NAME;
+    String name;
 
     @Column(name = "description", columnDefinition = "TEXT")
-    String DESCRIPTION;
+    String description;
 
     @Column(name = "center_lat", nullable = false, precision = 10, scale = 8)
-    BigDecimal CENTER_LAT;
+    BigDecimal centerLat;
 
     @Column(name = "center_lon", nullable = false, precision = 11, scale = 8)
-    BigDecimal CENTER_LON;
+    BigDecimal centerLon;
 
     @Column(name = "radius_meters", nullable = false)
-    Integer RADIUS_METERS = 100;
+    Integer radiusMeters = 100;
 
     @Column(name = "boundary", columnDefinition = "jsonb")
     @Type(JsonBinaryType.class)
-    Map<String, Object> BOUNDARY;
+    Map<String, Object> boundary;
 
     @Column(name = "level", length = 20)
-    String LEVEL; // LOW, MEDIUM, HIGH, CRITICAL
+    String level; // LOW, MEDIUM, HIGH, CRITICAL
 
     @Column(name = "is_active")
-    Boolean IS_ACTIVE = true;
+    Boolean isActive = true;
 
     @Column(name = "is_pinned")
-    Boolean IS_PINNED = false;
+    Boolean isPinned = false;
 
     @Column(name = "created_by")
-    UUID CREATED_BY;
+    UUID createdBy;
 
     @Column(name = "created_at", updatable = false)
-    LocalDateTime CREATED_AT;
+    LocalDateTime createdAt;
 
     @Column(name = "update_at")
-    LocalDateTime UPDATED_AT;
+    LocalDateTime updatedAt;
 
     @Column(name = "expires_at")
-    LocalDateTime EXPIRES_AT;
+    LocalDateTime expiresAt;
 
     @PrePersist
     protected void onCreate() {
-        CREATED_AT = LocalDateTime.now();
-        UPDATED_AT = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        UPDATED_AT = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 }

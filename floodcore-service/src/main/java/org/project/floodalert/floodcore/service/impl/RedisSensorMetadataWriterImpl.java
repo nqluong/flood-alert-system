@@ -2,10 +2,11 @@ package org.project.floodalert.floodcore.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.floodalert.floodcore.config.RedisKeyProperties;
 import org.project.floodalert.floodcore.model.Sensor;
 import org.project.floodalert.floodcore.service.CacheService;
 import org.project.floodalert.floodcore.service.SensorMetadataWriter;
-import org.project.floodalert.floodcore.service.mapper.SensorMetadataMapper;
+import org.project.floodalert.floodcore.mapper.SensorMetadataMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -18,23 +19,24 @@ import java.util.Map;
 public class RedisSensorMetadataWriterImpl implements SensorMetadataWriter {
     private final CacheService cacheService;
     private final SensorMetadataMapper metadataMapper;
-
-    private static final String SENSOR_INFO_KEY_PREFIX = "sensor:info:";
+    private final RedisKeyProperties redisKeyProperties;
 
     /**
      * Ghi metadata của nhiều sensors vào Redis sử dụng Pipeline
      */
     @Override
     public void batchWriteSensorMetadata(List<Sensor> sensors) {
+        String keyPrefix = redisKeyProperties.getKeys().getSensor().getInfo()
+                .replace(":{sensorId}", ":");
+        
         Map<String, Map<String, String>> batchData = new HashMap<>();
 
         sensors.forEach(sensor -> {
             Map<String, String> metadata = metadataMapper.toMetadataMap(sensor);
-            batchData.put(sensor.getSENSOR_ID(), metadata);
+            batchData.put(sensor.getSensorId(), metadata);
         });
 
-        cacheService.batchHSet(SENSOR_INFO_KEY_PREFIX, batchData);
+        cacheService.batchHSet(keyPrefix, batchData);
 
-        log.debug("[METADATA] Đã ghi metadata cho {} sensors", sensors.size());
     }
 }

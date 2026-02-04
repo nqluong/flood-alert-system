@@ -25,4 +25,18 @@ public class PageResponse <T>{
 
     @Builder.Default
     boolean sorted = false;
+
+    public static <T> PageResponse<T> of(List<T> content, Integer page, Integer size,
+                                         Long totalElements, Integer totalPages) {
+        return PageResponse.<T>builder()
+                .content(content)
+                .page(page)
+                .size(size)
+                .totalElements(totalElements)
+                .totalPages(totalPages)
+                .first(page == 0)
+                .last(page >= totalPages - 1)
+                .empty(content.isEmpty())
+                .build();
+    }
 }

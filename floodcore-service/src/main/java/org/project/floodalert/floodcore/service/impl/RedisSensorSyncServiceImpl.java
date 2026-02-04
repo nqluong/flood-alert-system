@@ -13,7 +13,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RedisSensorSyncServiceImpl implements SensorSyncService {
     private final SensorMetadataWriter metadataWriter;
-    private final SensorGeoWriter geoWriter;
+    private final SensorBlacklistWriter blacklistWriter;
     private final CacheCleanupService cleanupService;
 
     /**
@@ -22,12 +22,12 @@ public class RedisSensorSyncServiceImpl implements SensorSyncService {
     @Override
     public void syncSensorsToCache(List<Sensor> sensors) {
         //  Xóa dữ liệu cũ để tránh rác
-        cleanupService.cleanupSensorGeoData();
+        cleanupService.cleanupSensorBlacklist();
 
-        // Ghi metadata và geo-location sử dụng pipeline
+        // Ghi metadata và blacklist sử dụng pipeline
         metadataWriter.batchWriteSensorMetadata(sensors);
-        geoWriter.batchWriteSensorGeoLocation(sensors);
+        blacklistWriter.batchWriteSensorBlacklist(sensors);
 
-        log.debug("[SYNC] Hoàn tất đồng bộ {} sensors lên Redis", sensors.size());
+        log.info("[SYNC] Hoàn tất đồng bộ {} sensors lên Redis", sensors.size());
     }
 }

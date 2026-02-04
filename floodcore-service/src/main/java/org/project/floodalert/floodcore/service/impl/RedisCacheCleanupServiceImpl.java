@@ -2,6 +2,7 @@ package org.project.floodalert.floodcore.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.floodalert.floodcore.config.RedisKeyProperties;
 import org.project.floodalert.floodcore.service.CacheCleanupService;
 import org.project.floodalert.floodcore.service.CacheService;
 import org.springframework.stereotype.Service;
@@ -12,14 +13,14 @@ import org.springframework.stereotype.Service;
 public class RedisCacheCleanupServiceImpl implements CacheCleanupService {
 
     private final CacheService cacheService;
-    private static final String GEO_ALL_SENSORS_KEY = "maps:all_sensors";
+    private final RedisKeyProperties redisKeyProperties;
 
     /**
-     * Xóa dữ liệu geo-location cũ của sensors
+     * Xóa dữ liệu blacklist cũ của sensors
      */
     @Override
-    public void cleanupSensorGeoData() {
-        Boolean deleted = cacheService.delete(GEO_ALL_SENSORS_KEY);
-        log.debug("[CLEANUP] Đã xóa dữ liệu geo cũ. Kết quả: {}", deleted);
+    public void cleanupSensorBlacklist() {
+        String blacklistKey = redisKeyProperties.getKeys().getSensor().getBlacklist();
+        Boolean deleted = cacheService.delete(blacklistKey);
     }
 }

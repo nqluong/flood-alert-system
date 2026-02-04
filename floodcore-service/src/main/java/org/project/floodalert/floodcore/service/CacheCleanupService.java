@@ -3,7 +3,7 @@ package org.project.floodalert.floodcore.service;
 public interface CacheCleanupService {
 
     /**
-     * Xóa dữ liệu geo-location cũ
+     * Xóa dữ liệu blacklist cũ
      */
-    void cleanupSensorGeoData();
+    void cleanupSensorBlacklist();
 }

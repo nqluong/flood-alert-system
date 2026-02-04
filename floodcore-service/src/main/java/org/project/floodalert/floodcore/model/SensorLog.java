@@ -22,33 +22,33 @@ public class SensorLog {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
-    UUID ID;
+    UUID id;
 
     @Column(name = "sensor_id", nullable = false)
-    UUID SENSOR_ID;
+    UUID sensorId;
 
     @Column(name = "action", nullable = false, length = 50)
-    String ACTION; // CREATED, DISABLED, ENABLED, LOCATION_UPDATED
+    String action; // CREATED, DISABLED, ENABLED, LOCATION_UPDATED
 
     @Column(name = "performed_by")
-    UUID PERFORMED_BY;
+    UUID performedBy;
 
     @Column(name = "old_value", columnDefinition = "jsonb")
     @Type(JsonBinaryType.class)
-    Map<String, Object> OLD_VALUE;
+    Map<String, Object> oldValue;
 
     @Column(name = "new_value", columnDefinition = "jsonb")
     @Type(JsonBinaryType.class)
-    Map<String, Object> NEW_VALUE;
+    Map<String, Object> newValue;
 
     @Column(name = "comment", columnDefinition = "TEXT")
-    String COMMENT;
+    String comment;
 
     @Column(name = "created_at", updatable = false)
-    LocalDateTime CREATED_AT;
+    LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        CREATED_AT = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
     }
 }
