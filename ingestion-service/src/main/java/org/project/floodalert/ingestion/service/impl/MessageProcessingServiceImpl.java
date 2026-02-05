@@ -4,10 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.ingestion.domain.SensorMessage;
 import org.project.floodalert.ingestion.domain.ValidationResult;
-import org.project.floodalert.ingestion.service.MessageProcessingService;
-import org.project.floodalert.ingestion.service.MessagePublisher;
-import org.project.floodalert.ingestion.service.MessageValidator;
-import org.project.floodalert.ingestion.service.SensorIdExtractor;
+import org.project.floodalert.ingestion.service.*;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -20,6 +17,7 @@ public class MessageProcessingServiceImpl implements MessageProcessingService {
     private final SensorIdExtractor sensorIdExtractor;
     private final MessageValidator messageValidator;
     private final MessagePublisher messagePublisher;
+    private final SensorBlacklistService sensorBlacklistService;
 
     @Override
     public void process(String topic, String payload) {
@@ -28,6 +26,11 @@ public class MessageProcessingServiceImpl implements MessageProcessingService {
             String sensorId = sensorIdExtractor.extract(topic);
             if(sensorId == null){
                 log.warn("Could not extract sensor ID from topic: {}", topic);
+                return;
+            }
+
+            if(sensorBlacklistService.isSensorBlacklisted(sensorId)){
+                log.warn("Sensor is blacklisted - sensor_id: {}, topic: {}", sensorId, topic);
                 return;
             }
 
@@ -48,8 +51,7 @@ public class MessageProcessingServiceImpl implements MessageProcessingService {
                     .build();
             messagePublisher.publish(message);
             long processingTime = System.currentTimeMillis() - startTime;
-            log.info("Message processed successfully - sensor_id: {}, processing_time_ms: {}",
-                    sensorId, processingTime);
+            log.info("Message processed in {} ms", processingTime);
         } catch (Exception e) {
             log.error("Unexpected error processing message - topic: {}, error: {}",
                     topic, e.getMessage(), e);

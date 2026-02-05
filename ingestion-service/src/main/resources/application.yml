@@ -18,7 +18,8 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1ms
-
+  config:
+    import: classpath:key-redis.yml
 
 mqtt:
   borker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}

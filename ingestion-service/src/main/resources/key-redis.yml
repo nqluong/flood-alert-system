@@ -1,0 +1,13 @@
+redis:
+  keys:
+    sensor:
+      info: "sensor:info:{sensorId}"
+      status: "sensor:status:{sensorId}"
+      metadata: "sensor:metadata:{sensorId}"
+      blacklist: "sensor:blacklist"
+  ttl:
+    cache-default: 3600  # in seconds
+    sensor-info: -1
+    map-cache: 300
+    sensor-list: 20
+    sensor-detail: 3600
