@@ -3,6 +3,8 @@ package org.project.floodalert.common.security;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.util.UUID;
+
 public class SecurityContextUtils {
     /**
      * Lấy userId của user hiện tại
@@ -11,6 +13,21 @@ public class SecurityContextUtils {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof InternalUserDetails) {
             return ((InternalUserDetails) authentication.getPrincipal()).getUserId();
+        }
+        return null;
+    }
+
+    /**
+     * Lấy userId của user hiện tại dưới dạng UUID
+     */
+    public static UUID getCurrentUserIdAsUUID() {
+        String userId = getCurrentUserId();
+        if (userId != null) {
+            try {
+                return UUID.fromString(userId);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
         }
         return null;
     }

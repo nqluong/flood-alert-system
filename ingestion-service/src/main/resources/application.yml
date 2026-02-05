@@ -5,6 +5,22 @@ spring:
   application:
     name: ${SPRING_APPLICATION_NAME:ingention-service}
 
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 5000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  config:
+    import: classpath:key-redis.yml
+
 mqtt:
   borker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
   client-id: ${MQTT_CLIENT_ID:ingention-service}-${random.uuid}

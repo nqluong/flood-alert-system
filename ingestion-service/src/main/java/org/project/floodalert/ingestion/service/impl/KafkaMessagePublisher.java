@@ -23,25 +23,10 @@ public class KafkaMessagePublisher implements MessagePublisher {
 
     @Override
     public void publish(SensorMessage sensorMessage) {
-        CompletableFuture<SendResult<String, String>> future = kafkaTemplate.send(
+        kafkaTemplate.send(
                 topic,
                 sensorMessage.getSensorId(),
                 sensorMessage.getRawPayload()
         );
-
-        future.whenComplete((r, e) -> {
-            if(e == null){
-                log.info("Message published to Kafka - sensor_id: {}, partition: {}, offset: {}",
-                        sensorMessage.getSensorId(),
-                        r.getRecordMetadata().partition(),
-                        r.getRecordMetadata().offset()
-                );
-            }else {
-                log.error("Failed to publish message to Kafka - sensor_id: {}, error: {}",
-                        sensorMessage.getSensorId(),
-                        e.getMessage()
-                );
-            }
-        });
     }
 }
