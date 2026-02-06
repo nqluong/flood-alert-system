@@ -1,5 +1,51 @@
 server:
   port: 8084
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 10
 spring:
   application:
     name: floodprocessor-service
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: "jdbc:${DB_URL_FLOODPROCESSOR}"
+    username: ${DB_USERNAME_FLOODPROCESSOR}
+    password: ${DB_PASSWORD_FLOODPROCESSOR}
+    driver-class-name: "org.postgresql.Driver"
+  jpa:
+    hibernate:
+        ddl-auto: none
+    show-sql: false
+    properties:
+        hibernate:
+            format_sql: true
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+      timeout: 5000
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+  config:
+    import: classpath:key-redis.yml
+
+app:
+  kafka:
+    topic:
+      ingest: ${KAFKA_INGEST_TOPIC:iot-raw}
+    consumer:
+        group-id: ${KAFKA_CONSUMER_GROUP_ID:flood-processor-group}
+        concurrency: ${KAFKA_CONSUMER_CONCURRENCY:10}  # Tăng concurrency vì dùng Virtual Threads (lightweight)
+        max-poll-records: ${KAFKA_MAX_POLL_RECORDS:500}
+        batch-listener: true

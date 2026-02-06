@@ -22,44 +22,44 @@ public class AlterTrigger {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
-    UUID ID;
+    UUID id;
 
     @Column(name = "trigger_id", nullable = false, unique = true, length = 50)
-    String TRIGGER_ID;
+    String triggerId;
 
     @Column(name = "flood_event_id")
-    UUID FLOOD_EVENT_ID;
+    UUID floodEventId;
 
     @Column(name = "trigger_type", nullable = false, length = 50)
-    String TRIGGER_TYPE;
+    String triggerType;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "trigger_condition", columnDefinition = "jsonb")
-    String TRIGGER_CONDITION;
+    String triggerCondition;
 
     @Column(name = "affected_users_count")
-    Integer AFFECTED_USERS_COUNT = 0;
+    Integer affectedUserCount = 0;
 
     @Column(name = "search_radius_meters")
-    Integer SEARCH_RADIUS_METERS;
+    Integer searchRadiusMeters;
 
     @Column(name = "search_center_lat", precision = 10, scale = 8)
-    BigDecimal SEARCH_CENTER_LAT;
+    BigDecimal searchCenterLat;
 
     @Column(name = "search_center_lon", precision = 11, scale = 8)
-    BigDecimal SEARCH_CENTER_LON;
+    BigDecimal searchCenterLon;
 
     @Column(name = "status", length = 20)
-    String STATUS = "TRIGGERED";
+    String status = "TRIGGERED";
 
     @Column(name = "triggered_at")
-    LocalDateTime TRIGGERED_AT;
+    LocalDateTime triggeredAt;
 
     @Column(name = "completed_at")
-    LocalDateTime COMPLETED_AT;
+    LocalDateTime completedAt;
 
     @PrePersist
     protected void onCreate() {
-        TRIGGERED_AT = LocalDateTime.now();
+        triggeredAt = LocalDateTime.now();
     }
 }

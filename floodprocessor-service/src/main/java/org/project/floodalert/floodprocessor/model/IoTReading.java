@@ -25,44 +25,44 @@ public class IoTReading {
     @Id
     @Column(name = "id", updatable = false, nullable = false)
     @GeneratedValue(strategy = GenerationType.UUID)
-    UUID ID;
+    UUID id;
 
     @Column(name = "reading_id", nullable = false, unique = true, length = 50)
-    String READING_ID;
+    String readingId;
 
     @Column(name = "sensor_id", nullable = false, length = 50)
-    String SENSOR_ID;
+    String sensorId;
 
     @Column(name = "flood_event_id")
-    UUID FLOOD_EVENT_ID;
+    UUID floodEventId;
 
     @Column(name = "water_level", precision = 5, scale = 2)
-    BigDecimal WATER_LEVEL;
+    BigDecimal waterLevel;
 
     @Column(name = "battery_level")
-    Integer BATTERY_LEVEL;
+    Integer batteryLevel;
 
     @Column(name = "signal_strength")
-    Integer SIGNAL_STRENGTH;
+    Integer signalStrength;
 
     @Column(name = "temperature", precision = 4, scale = 1)
-    BigDecimal TEMPERATURE;
+    BigDecimal temperature;
 
     @Column(name = "humidity", precision = 4, scale = 1)
-    BigDecimal HUMIDITY;
+    BigDecimal humidity;
 
     @Column(name = "measured_at", nullable = false)
-    LocalDateTime MEASURED_AT;
+    LocalDateTime measuredAt;
 
     @Column(name = "received_at")
-    LocalDateTime RECEIVED_AT;
+    LocalDateTime receivedAt;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "raw_payload", columnDefinition = "jsonb")
-    Map<String, Object> RAW_PAYLOAD;
+    Map<String, Object> rawPayload;
 
     @PrePersist
     protected void onCreate() {
-        RECEIVED_AT = LocalDateTime.now();
+        receivedAt = LocalDateTime.now();
     }
 }

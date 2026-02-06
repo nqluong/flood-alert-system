@@ -133,3 +133,54 @@
 1770261787: Client ingention-service-879b13a0-ae51-4fb6-8970-8b66aa941944 disconnected.
 1770261791: Client floodguard-simulator-1770261500 closed its connection.
 1770262365: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770303974: mosquitto version 2.0.22 starting
+1770303974: Config loaded from /mosquitto/config/mosquitto.conf.
+1770303974: Opening ipv4 listen socket on port 1883.
+1770303974: Opening ipv6 listen socket on port 1883.
+1770303974: Opening websockets listen socket on port 9001.
+1770303974: mosquitto version 2.0.22 running
+1770305774: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770307575: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770309376: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770311177: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770312978: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770314779: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770341714: mosquitto version 2.0.22 starting
+1770341714: Config loaded from /mosquitto/config/mosquitto.conf.
+1770341714: Opening ipv4 listen socket on port 1883.
+1770341714: Opening ipv6 listen socket on port 1883.
+1770341714: Opening websockets listen socket on port 9001.
+1770341714: mosquitto version 2.0.22 running
+1770343514: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770345315: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770347115: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770347571: New connection from 172.23.0.1:44258 on port 1883.
+1770347571: New client connected from 172.23.0.1:44258 as ingention-service-a6b82040-bc74-4761-b491-5dcf37d5ffbf (p2, c1, k60).
+1770347647: New connection from 172.23.0.1:42484 on port 1883.
+1770347647: New client connected from 172.23.0.1:42484 as floodguard-simulator-1770347647 (p2, c1, k60).
+1770347715: Client floodguard-simulator-1770347647 closed its connection.
+1770347717: Client ingention-service-a6b82040-bc74-4761-b491-5dcf37d5ffbf disconnected.
+1770348226: New connection from 172.23.0.1:38858 on port 1883.
+1770348226: New client connected from 172.23.0.1:38858 as floodguard-simulator-1770348226 (p2, c1, k60).
+1770348252: New connection from 172.23.0.1:38128 on port 1883.
+1770348252: New client connected from 172.23.0.1:38128 as mqtt-explorer-b7063bae (p2, c1, k60).
+1770348266: Client mqtt-explorer-b7063bae disconnected.
+1770348271: New connection from 172.23.0.1:53064 on port 1883.
+1770348271: New client connected from 172.23.0.1:53064 as mqtt-explorer-b7063bae (p2, c1, k60).
+1770348282: New connection from 172.23.0.1:37484 on port 1883.
+1770348283: New client connected from 172.23.0.1:37484 as ingention-service-b2839ef0-2924-4077-b0f7-f871cbdc586e (p2, c1, k60).
+1770348357: New connection from 172.23.0.1:51980 on port 1883.
+1770348357: New client connected from 172.23.0.1:51980 as floodguard-simulator-1770348357 (p2, c1, k60).
+1770348478: Client mqtt-explorer-b7063bae disconnected.
+1770348482: Client floodguard-simulator-1770348357 closed its connection.
+1770348482: Client floodguard-simulator-1770348226 closed its connection.
+1770348916: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770348982: Client ingention-service-b2839ef0-2924-4077-b0f7-f871cbdc586e disconnected.
+1770350717: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770352518: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770354319: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770356120: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770357921: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770359721: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770361522: Saving in-memory database to /mosquitto/data//mosquitto.db.
+1770363323: Saving in-memory database to /mosquitto/data//mosquitto.db.

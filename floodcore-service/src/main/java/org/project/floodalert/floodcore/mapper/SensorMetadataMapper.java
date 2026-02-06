@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class SensorMetadataMapper {
@@ -38,7 +39,10 @@ public class SensorMetadataMapper {
                 ? sensor.getLat().toString() : "0");
         metadata.put("lon", sensor.getLon() != null
                 ? sensor.getLon().toString() : "0");
-
+        metadata.put("warning_threshold", sensor.getWarningThreshold() != null
+                ? Objects.requireNonNull(sensor.getWarningThreshold()).toString() : "0");
+        metadata.put("danger_threshold", sensor.getDangerThreshold() != null
+                ? Objects.requireNonNull(sensor.getDangerThreshold()).toString() : "0");
         return metadata;
     }
 

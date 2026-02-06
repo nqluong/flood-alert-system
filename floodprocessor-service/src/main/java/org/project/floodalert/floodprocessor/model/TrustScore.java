@@ -22,41 +22,41 @@ public class TrustScore {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
-    UUID ID;
+    UUID id;
 
     @Column(name = "flood_event_id", nullable = false)
-    UUID FLOOD_EVENT_ID;
+    UUID floodEventId;
 
     @Column(name = "iot_score", precision = 3, scale = 2)
-    BigDecimal IOT_SCORE;
+    BigDecimal iotScore;
 
     @Column(name = "user_vote_score", precision = 3, scale = 2)
-    BigDecimal USER_VOTE_SCORE;
+    BigDecimal userVoteScore;
 
     @Column(name = "historical_score", precision = 3, scale = 2)
-    BigDecimal HISTORICAL_SCORE;
+    BigDecimal historicalScore;
 
     @Column(name = "spatial_correlation_score", precision = 3, scale = 2)
-    BigDecimal SPATIAL_CORRELATION_SCORE;
+    BigDecimal spatialCorrelationScore;
 
     @Column(name = "final_score", nullable = false, precision = 3, scale = 2)
-    BigDecimal FINAL_SCORE;
+    BigDecimal finalScore;
 
     @Column(name = "calculation_method", length = 50)
-    String CALCULATION_METHOD;
+    String calculationMethod;
 
     @Column(name = "algorithm_version", length = 20)
-    String ALGORITHM_VERSION;
+    String algorithmVersion;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "factors", columnDefinition = "jsonb")
-    String FACTORS;
+    String factors;
 
     @Column(name = "calculated_at")
-    LocalDateTime CALCULATED_AT;
+    LocalDateTime calculatedAt;
 
     @PrePersist
     protected void onCreate() {
-        CALCULATED_AT = LocalDateTime.now();
+        calculatedAt = LocalDateTime.now();
     }
 }

@@ -30,7 +30,7 @@ mqtt:
 
 kafka:
   bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-  topic: ${KAFKA_TOPIC:iot-raw}
+  topic: ${KAFKA_INGEST_TOPIC:iot-raw}
   producer:
     key-serializer: ${KAFKA_PRODUCER_KEY_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
     value-serializer: ${KAFKA_PRODUCER_VALUE_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}

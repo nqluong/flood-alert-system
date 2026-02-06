@@ -24,77 +24,77 @@ public class FloodEvent {
     @Id
     @Column(name = "id", updatable = false, nullable = false)
     @GeneratedValue(strategy = GenerationType.UUID)
-    UUID ID;
+    UUID id;
 
     @Column(name = "event_id", nullable = false, unique = true, length = 50)
-    String EVENT_ID;
+    String eventId;
 
     @Column(name = "source", nullable = false, length = 20)
-    String SOURCE;
+    String source;
 
     @Column(name = "source_id", length = 100)
-    String SOURCE_ID;
+    String sourceId;
 
     @Column(name = "lat", nullable = false, precision = 10, scale = 8)
-    BigDecimal LAT;
+    BigDecimal lat;
 
     @Column(name = "lon", nullable = false, precision = 10, scale = 8)
-    BigDecimal LON;
+    BigDecimal lon;
 
     @Column(name = "location_description", columnDefinition = "TEXT")
-    String LOCATION_DESCRIPTION;
+    String locationDescription;
 
     @Column(name = "geo_hash", length = 20)
-    String GEO_HASH;
+    String geoHash;
 
     @Column(name = "water_level", precision = 5, scale = 2)
-    BigDecimal WATER_LEVEL;
+    BigDecimal waterLevel;
 
     @Column(name = "severity_level", length = 20)
-    String SEVERITY_LEVEL;
+    String severityLevel;
 
     @Column(name = "status", length = 20)
-    String STATUS = "PENDING";
+    String status = "PENDING";
 
     @Column(name = "confidence_score", precision = 3, scale = 2)
-    BigDecimal CONFIDENCE_SCORE = BigDecimal.ZERO;
+    BigDecimal confidenceScore = BigDecimal.ZERO;
 
     @Column(name = "vote_count")
-    Integer VOTE_COUNT = 1;
+    Integer voteCount = 1;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "raw_data", columnDefinition = "jsonb")
-    Map<String, Object> RAW_DATA;
+    Map<String, Object> rawData;
 
     @Type(StringArrayType.class)
     @Column(name = "tags", columnDefinition = "text[]")
-    String[] TAGS;
+    String[] tags;
 
     @Column(name = "processed_at")
-    LocalDateTime PROCESSED_AT;
+    LocalDateTime processedAt;
 
     @Column(name = "confirmed_at")
-    LocalDateTime CONFIRMED_AT;
+    LocalDateTime confirmedAt;
 
     @Column(name = "expires_at")
-    LocalDateTime EXPIRES_AT;
+    LocalDateTime expiresAt;
 
     @Column(name = "created_at", updatable = false)
-    LocalDateTime CREATED_AT;
+    LocalDateTime createdAt;
 
     @Column(name = "updated_at")
-    LocalDateTime UPDATE_AT;
+    LocalDateTime updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        CREATED_AT = LocalDateTime.now();
-        UPDATE_AT = LocalDateTime.now();
-        PROCESSED_AT = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+        processedAt = LocalDateTime.now();
     }
 
     @PreUpdate
     protected void onUpdate() {
-        UPDATE_AT = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 
 

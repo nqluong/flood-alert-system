@@ -22,50 +22,50 @@ public class UserReport {
     @Id
     @Column(name = "id", updatable = false, nullable = false)
     @GeneratedValue(strategy = GenerationType.UUID)
-    String ID;
+    String id;
 
     @Column(name = "report_id", nullable = false, unique = true, length = 50)
-    String REPORT_ID;
+    String reportId;
 
     @Column(name = "user_id", nullable = false)
-    UUID USER_ID;
+    UUID userId;
 
     @Column(name = "flood_event_id")
-    UUID FLOOD_EVENT_ID;
+    UUID floodEventId;
 
     @Column(name = "description", columnDefinition = "TEXT")
-    String DESCRIPTION;
+    String description;
 
     @Type(StringArrayType.class)
     @Column(name = "image_urls", columnDefinition = "text[]")
-    String[] IMAGE_URLS;
+    String[] imageUrls;
 
     @Column(name = "severity_level", length = 20)
-    String SEVERITY_LEVEL;
+    String severityLevel;
 
     @Column(name = "lat", nullable = false, precision = 10, scale = 8)
-    BigDecimal LAT;
+    BigDecimal lat;
 
     @Column(name = "lon", nullable = false, precision = 11, scale = 8)
-    BigDecimal LON;
+    BigDecimal lon;
 
     @Column(name = "status", length = 20)
-    String STATUS = "PENDING";
+    String status = "PENDING";
 
     @Column(name = "reviewed_by")
-    UUID REVIEWED_BY;
+    UUID reviewedBy;
 
     @Column(name = "reviewed_at")
-    LocalDateTime REVIEWED_AT;
+    LocalDateTime reviewedAt;
 
     @Column(name = "reject_reason", columnDefinition = "TEXT")
-    String REJECT_REASON;
+    String rejectReason;
 
     @Column(name = "created_at", updatable = false)
-    LocalDateTime CREATED_AT;
+    LocalDateTime createdAt;
 
     @PrePersist
     protected void onCreate() {
-        CREATED_AT = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
     }
 }
