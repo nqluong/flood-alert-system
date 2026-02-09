@@ -14,4 +14,9 @@ import org.project.floodalert.floodprocessor.enums.FloodStatus;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ProcessedSensorData extends EnrichedSensorData{
     FloodStatus status;
+
+    FloodStatus previousStatus;
+
+    @Builder.Default
+    boolean stateChanged = false;
 }
