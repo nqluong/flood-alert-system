@@ -21,6 +21,8 @@ spring:
     show-sql: false
     properties:
         hibernate:
+            jdbc:
+              batch_size: 50
             format_sql: true
   data:
     redis:
@@ -44,8 +46,9 @@ app:
   kafka:
     topic:
       ingest: ${KAFKA_INGEST_TOPIC:iot-raw}
+      output: ${KAFKA_OUTPUT_TOPIC:flood-sensor-data-processed}
     consumer:
         group-id: ${KAFKA_CONSUMER_GROUP_ID:flood-processor-group}
-        concurrency: ${KAFKA_CONSUMER_CONCURRENCY:10}  # Tăng concurrency vì dùng Virtual Threads (lightweight)
+        concurrency: ${KAFKA_CONSUMER_CONCURRENCY:3}
         max-poll-records: ${KAFKA_MAX_POLL_RECORDS:500}
         batch-listener: true

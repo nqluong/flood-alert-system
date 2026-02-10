@@ -7,6 +7,7 @@ import org.project.floodalert.floodprocessor.dto.response.EnrichedSensorData;
 import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.exception.ProcessorErrorCode;
 import org.project.floodalert.floodprocessor.service.BusinessLogicService;
+import org.project.floodalert.floodprocessor.service.DispatcherService;
 import org.project.floodalert.floodprocessor.service.FloodAssessmentService;
 import org.project.floodalert.floodprocessor.service.StateChangeService;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,7 @@ public class BusinessLogicServiceImpl implements BusinessLogicService {
 
     private final FloodAssessmentService floodAssessmentService;
     private final StateChangeService stateChangeService;
+    private final DispatcherService dispatcherService;
 
     @Override
     public void process(List<EnrichedSensorData> enrichedDataList) {
@@ -46,8 +48,7 @@ public class BusinessLogicServiceImpl implements BusinessLogicService {
             log.info("Module 3: Hoàn thành - State changes đã được detect");
 
             log.info("Module 4: Gửi alerts/notifications (TODO)");
-
-            logSensorsNeedingNotification(processedDataList);
+            dispatcherService.dispatch(processedDataList);
 
             log.info("=== HOÀN THÀNH XỬ LÝ BUSINESS LOGIC: {} records ===",
                     processedDataList.size());
@@ -56,35 +57,5 @@ public class BusinessLogicServiceImpl implements BusinessLogicService {
             log.error("Lỗi nghiêm trọng khi xử lý business logic", e);
             throw new AppException(ProcessorErrorCode.PROCESSING_FAILED);
         }
-    }
-
-    private void logSensorsNeedingNotification(List<ProcessedSensorData> processedDataList) {
-        List<ProcessedSensorData> needNotification = processedDataList.stream()
-                .filter(ProcessedSensorData::isStateChanged)
-                .toList();
-
-        if (needNotification.isEmpty()) {
-            log.info("Không có sensor nào cần gửi notification");
-            return;
-        }
-
-        log.info("Cần gửi notification cho {} sensors:", needNotification.size());
-
-        needNotification.forEach(data -> {
-            String emoji = switch (data.getStatus()) {
-                case DANGER -> "🔴";
-                case WARNING -> "🟡";
-                case SAFE -> "🟢";
-                case UNKNOWN -> "⚪";
-            };
-
-            log.info("  {} Sensor: {} | {} → {} | Vị trí: {} | Mức nước: {}m",
-                    emoji,
-                    data.getSensorId(),
-                    data.getPreviousStatus(),
-                    data.getStatus(),
-                    data.getLocationName(),
-                    data.getWaterLevel());
-        });
     }
 }

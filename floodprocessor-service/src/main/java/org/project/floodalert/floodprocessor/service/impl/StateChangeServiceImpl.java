@@ -51,10 +51,6 @@ public class StateChangeServiceImpl implements StateChangeService {
 
         // Batch save trạng thái mới vào Redis
         redisStateRepository.batchSaveNewStatuses(newStatusMap);
-
-        // Log statistics
-        logStatistics(processedDataList);
-
         log.info("Hoàn thành phát hiện thay đổi trạng thái cho {} sensors", processedDataList.size());
     }
 
@@ -85,39 +81,5 @@ public class StateChangeServiceImpl implements StateChangeService {
         return newStatusMap;
     }
 
-
-    private void logStatistics(List<ProcessedSensorData> processedDataList) {
-        // Đếm số lượng sensors có thay đổi trạng thái
-        long changedCount = processedDataList.stream()
-                .filter(ProcessedSensorData::isStateChanged)
-                .count();
-
-        long unchangedCount = processedDataList.size() - changedCount;
-
-        log.info("Thống kê State Changes: {} thay đổi, {} không đổi",
-                changedCount, unchangedCount);
-
-        if (changedCount > 0) {
-            List<String> changedSensorIds = processedDataList.stream()
-                    .filter(ProcessedSensorData::isStateChanged)
-                    .map(data -> String.format("%s (%s→%s)",
-                            data.getSensorId(),
-                            data.getPreviousStatus(),
-                            data.getStatus()))
-                    .toList();
-
-            log.info("Các sensors có thay đổi trạng thái: {}", changedSensorIds);
-        }
-
-        long newDangerCount = processedDataList.stream()
-                .filter(ProcessedSensorData::isStateChanged)
-                .filter(data -> data.getStatus() == FloodStatus.DANGER)
-                .count();
-
-        if (newDangerCount > 0) {
-            log.warn("CẢNH BÁO: Có {} sensors mới chuyển sang trạng thái DANGER!",
-                    newDangerCount);
-        }
-    }
 
 }

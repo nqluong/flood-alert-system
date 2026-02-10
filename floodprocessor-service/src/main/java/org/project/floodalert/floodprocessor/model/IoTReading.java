@@ -1,14 +1,19 @@
 package org.project.floodalert.floodprocessor.model;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.Type;
 import org.hibernate.type.SqlTypes;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -52,17 +57,18 @@ public class IoTReading {
     BigDecimal humidity;
 
     @Column(name = "measured_at", nullable = false)
-    LocalDateTime measuredAt;
+    Instant measuredAt;
 
+    @CreationTimestamp
     @Column(name = "received_at")
-    LocalDateTime receivedAt;
+    Instant receivedAt;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @Type(JsonBinaryType.class)
     @Column(name = "raw_payload", columnDefinition = "jsonb")
-    Map<String, Object> rawPayload;
+    JsonNode rawPayload;
 
-    @PrePersist
-    protected void onCreate() {
-        receivedAt = LocalDateTime.now();
-    }
+    @Column(name = "status", length = 20)
+    String status;
+
+
 }
