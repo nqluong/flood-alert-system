@@ -47,8 +47,16 @@ app:
     topic:
       ingest: ${KAFKA_INGEST_TOPIC:iot-raw}
       output: ${KAFKA_OUTPUT_TOPIC:flood-sensor-data-processed}
+      lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
     consumer:
         group-id: ${KAFKA_CONSUMER_GROUP_ID:flood-processor-group}
         concurrency: ${KAFKA_CONSUMER_CONCURRENCY:3}
         max-poll-records: ${KAFKA_MAX_POLL_RECORDS:500}
         batch-listener: true
+
+  aggregator:
+    kafka:
+      consumer:
+        group-id: ${KAFKA_AGGREGATOR_GROUP_ID:flood-event-aggregator-group}
+        concurrency: ${KAFKA_AGGREGATOR_CONCURRENCY:3}
+        max-poll-records: ${KAFKA_AGGREGATOR_MAX_POLL_RECORDS:100}
