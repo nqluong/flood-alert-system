@@ -16,17 +16,24 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class KafkaMessagePublisher implements MessagePublisher {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     @Value("${kafka.topic}")
     private String topic;
 
     @Override
     public void publish(SensorMessage sensorMessage) {
-        kafkaTemplate.send(
+        CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(
                 topic,
                 sensorMessage.getSensorId(),
-                sensorMessage.getRawPayload()
+                sensorMessage
         );
+
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("[INGESTION] Gửi Kafka thất bại cho sensor {}: {}",
+                        sensorMessage.getSensorId(), ex.getMessage());
+            }
+        });
     }
 }

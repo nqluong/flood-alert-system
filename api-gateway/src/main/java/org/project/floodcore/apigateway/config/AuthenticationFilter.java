@@ -38,7 +38,11 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/flood-alert/api/v1/auth/login",
             "/flood-alert/api/v1/auth/register",
-            "/flood-alert/api/v1/auth/refresh-token"
+            "/flood-alert/api/v1/auth/refresh-token",
+            // WebSocket endpoint — SockJS handshake và STOMP Upgrade không mang Bearer token
+            // trong header chuẩn, nên bypass auth tại Gateway; bảo mật xử lý ở tầng service nếu cần
+            "/flood-alert/ws-admin",
+            "/flood-alert/ws"
     );
 
     @Override

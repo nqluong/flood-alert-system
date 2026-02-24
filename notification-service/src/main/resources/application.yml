@@ -4,3 +4,20 @@ server:
 spring:
   application:
     name: notification-service
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      enable-auto-commit: false
+      auto-offset-reset: latest
+
+app:
+  kafka:
+    topic:
+      processed-events: flood-processed-events
+      lifecycle-events: flood-lifecycle-events
+    consumer:
+      telemetry:
+        group-id: admin-socket-telemetry-group
+      alert:
+        group-id: admin-socket-alert-group

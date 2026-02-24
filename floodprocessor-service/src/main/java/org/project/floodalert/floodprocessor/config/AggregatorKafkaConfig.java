@@ -10,19 +10,12 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
+import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Cấu hình Kafka Consumer riêng cho Module 5 (Event Aggregator).
- * Consumer group này ({@code flood-event-aggregator-group}) tách biệt hoàn toàn
- * với consumer group của pipeline ingestion, đảm bảo hai pipeline không xung đột.
- *
- * Bean được đặt tên {@code aggregatorKafkaListenerContainerFactory} để
- * {@link org.project.floodalert.floodprocessor.kafka.EventAggregatorListener}
- * chỉ định qua {@code containerFactory}.
- */
+
 @Slf4j
 @Configuration
 public class AggregatorKafkaConfig {
@@ -48,37 +41,31 @@ public class AggregatorKafkaConfig {
      * Sử dụng String deserializer – JSON được parse thủ công trong listener.
      */
     @Bean
-    public ConsumerFactory<String, String> aggregatorConsumerFactory() {
+    public ConsumerFactory<String, Object> aggregatorConsumerFactory() {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.GROUP_ID_CONFIG, aggregatorGroupId);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, aggregatorMaxPollRecords);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
+                "org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData");
 
         return new DefaultKafkaConsumerFactory<>(props);
     }
 
-    /**
-     * Container Factory batch cho Module 5.
-     * Cho phép listener nhận một {@code List<String>} mỗi lần poll,
-     * sau đó xử lý song song trong {@link org.project.floodalert.floodprocessor.service.aggregator.FloodEventProcessorService}.
-     */
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, String> aggregatorKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, String> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, Object> aggregatorKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
 
         factory.setConsumerFactory(aggregatorConsumerFactory());
         factory.setBatchListener(true);
         factory.setConcurrency(aggregatorConcurrency);
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
-
-        log.info("Khởi tạo Aggregator Kafka Listener Factory – concurrency: {}, batch-mode: true",
-                aggregatorConcurrency);
 
         return factory;
     }

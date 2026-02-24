@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.exception.AppException;
+import org.project.floodalert.floodprocessor.dto.request.SensorMessage;
 import org.project.floodalert.floodprocessor.dto.request.SensorRaw;
 import org.project.floodalert.floodprocessor.dto.response.EnrichedSensorData;
 import org.project.floodalert.floodprocessor.exception.ProcessorErrorCode;
@@ -28,7 +29,7 @@ public class IngestionBatchHandler {
             groupId = "${app.kafka.consumer.group-id}",
             containerFactory = "batchKafkaListenerContainerFactory"
     )
-    public void consumeBatch(List<String> messages, Acknowledgment acknowledgment) {
+    public void consumeBatch(List<SensorMessage> messages, Acknowledgment acknowledgment) {
         log.info("=== BẮT ĐẦU XỬ LÝ BATCH: {} messages ===", messages.size());
 
         try {
@@ -71,13 +72,13 @@ public class IngestionBatchHandler {
     }
 
 
-    private ParseResult parseAndExtract(List<String> messages) {
+    private ParseResult parseAndExtract(List<SensorMessage> messages) {
         List<SensorRaw> validDtos = new ArrayList<>();
         Set<String> sensorIds = new HashSet<>();
 
-        for (String message : messages) {
+        for (SensorMessage message : messages) {
             try {
-                SensorRaw dto = objectMapper.readValue(message, SensorRaw.class);
+                SensorRaw dto = objectMapper.readValue(message.getRawPayload(), SensorRaw.class);
 
                 // Validate cơ bản
                 if (dto.getDeviceInfo() == null || dto.getDeviceInfo().getSensorId() == null) {

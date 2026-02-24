@@ -28,5 +28,16 @@ spring:
             max-idle: 8
             min-idle: 0
             max-wait: -1ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
   config:
     import: classpath:key-redis.yml
+
+app:
+  kafka:
+    topic:
+      lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
+    consumer:
+      core-sync:
+        group-id: ${KAFKA_CORE_SYNC_GROUP_ID:core-map-sync-group}
+

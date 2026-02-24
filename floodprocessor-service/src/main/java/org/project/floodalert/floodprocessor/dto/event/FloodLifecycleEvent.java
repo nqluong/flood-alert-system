@@ -10,10 +10,6 @@ import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 
 import java.time.LocalDateTime;
 
-/**
- * DTO đại diện cho một sự kiện vòng đời của Flood Event.
- * Được bắn ra Kafka topic "flood-lifecycle-events" để Admin và Notification service tiêu thụ.
- */
 @Data
 @Builder
 @NoArgsConstructor

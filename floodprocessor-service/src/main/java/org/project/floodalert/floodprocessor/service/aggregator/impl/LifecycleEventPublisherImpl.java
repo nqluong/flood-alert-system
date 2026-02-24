@@ -1,7 +1,5 @@
 package org.project.floodalert.floodprocessor.service.aggregator.impl;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
@@ -23,20 +21,16 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class LifecycleEventPublisherImpl implements LifecycleEventPublisher {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     /** Topic nhận lifecycle event, cấu hình qua application.yml */
     @Value("${app.kafka.topic.lifecycle:flood-lifecycle-events}")
     private String lifecycleTopic;
 
-    // =========================================================================
-    // Public API
-    // =========================================================================
 
     /**
      * {@inheritDoc}
-     * Serialize DTO sang JSON và gửi bất đồng bộ (async) lên Kafka.
+     * Gửi FloodLifecycleEvent bất đồng bộ (async) lên Kafka.
      * Kết quả được log qua callback.
      */
     @Override
@@ -46,33 +40,25 @@ public class LifecycleEventPublisherImpl implements LifecycleEventPublisher {
             return;
         }
 
-        try {
-            String jsonPayload = objectMapper.writeValueAsString(event);
+        // Gửi Kafka với eventId làm key để đảm bảo ordering theo event
+        CompletableFuture<SendResult<String, Object>> future =
+                kafkaTemplate.send(lifecycleTopic, event.getEventId(), event);
 
-            // Gửi Kafka với eventId làm key để đảm bảo ordering theo event
-            CompletableFuture<SendResult<String, String>> future =
-                    kafkaTemplate.send(lifecycleTopic, event.getEventId(), jsonPayload);
+        // Callback bất đồng bộ để log kết quả
+        future.whenComplete((result, ex) -> {
+            if (ex != null) {
+                log.error("Gửi Lifecycle Event thất bại cho sự kiện [{}] – type [{}]: {}",
+                        event.getEventId(), event.getType(), ex.getMessage());
+            } else {
+                var meta = result.getRecordMetadata();
+                log.info("Lifecycle Event đã gửi thành công: sự kiện=[{}], type=[{}], " +
+                                "topic={}, partition={}, offset={}",
+                        event.getEventId(), event.getType(),
+                        meta.topic(), meta.partition(), meta.offset());
+            }
+        });
 
-            // Callback bất đồng bộ để log kết quả
-            future.whenComplete((result, ex) -> {
-                if (ex != null) {
-                    log.error("Gửi Lifecycle Event thất bại cho sự kiện [{}] – type [{}]: {}",
-                            event.getEventId(), event.getType(), ex.getMessage());
-                } else {
-                    var meta = result.getRecordMetadata();
-                    log.info("Lifecycle Event đã gửi thành công: sự kiện=[{}], type=[{}], " +
-                                    "topic={}, partition={}, offset={}",
-                            event.getEventId(), event.getType(),
-                            meta.topic(), meta.partition(), meta.offset());
-                }
-            });
-
-            log.debug("Đã đặt lịch gửi Lifecycle Event [{}] type [{}] lên topic [{}]",
-                    event.getEventId(), event.getType(), lifecycleTopic);
-
-        } catch (JsonProcessingException e) {
-            log.error("Lỗi serialize Lifecycle Event cho sự kiện [{}]: {}",
-                    event.getEventId(), e.getMessage());
-        }
+        log.debug("Đã đặt lịch gửi Lifecycle Event [{}] type [{}] lên topic [{}]",
+                event.getEventId(), event.getType(), lifecycleTopic);
     }
 }
