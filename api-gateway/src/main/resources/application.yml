@@ -5,6 +5,25 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowedOrigins:
+              - "http://localhost:5173"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders:
+              - "*"
+            exposedHeaders:
+              - "*"
+            allowCredentials: true
+            maxAge: 3600
       routes:
         - id: auth-service
           uri: http://localhost:8081
@@ -22,7 +41,8 @@ spring:
             - Path=/flood-alert/api/v1/warnings/**,
               /flood-alert/api/v1/alerts/**,
               /flood-alert/api/v1/devices/**,
-              /flood-alert/api/v1/sensors/**
+              /flood-alert/api/v1/sensors/**,
+              /flood-alert/api/v1/admin/floods/**,
           filters:
             - StripPrefix=1
 
@@ -34,31 +54,28 @@ spring:
             - StripPrefix=1
 
         - id: notification-service
-          uri: http://localhost:8084
+          uri: http://localhost:8085
           predicates:
             - Path=/flood-alert/api/v1/notifications/**
           filters:
             - StripPrefix=1
 
-        # Route WebSocket cho SockJS client (browser, SockJS lib)
-        # SockJS tạo các sub-path: /ws-admin/info, /ws-admin/{server}/{session}/websocket
-        # → tất cả đều khớp với /flood-alert/ws-admin/**
         - id: notification-service-websocket-sockjs
-          uri: ws://localhost:8084
+          uri: http://localhost:8085
           predicates:
             - Path=/flood-alert/ws-admin/**
           filters:
             - StripPrefix=1
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary, RETAIN_FIRST
 
-        # Route WebSocket thuần (native WS) — dùng cho Postman hoặc client không dùng SockJS
-        # Client kết nối: ws://localhost:8080/flood-alert/ws
-        # Sau khi connect → gửi STOMP SUBSCRIBE tới /topic/admin/alerts hoặc /topic/admin/map/telemetry
         - id: notification-service-websocket-native
-          uri: ws://localhost:8084
+          uri: http://localhost:8085
           predicates:
             - Path=/flood-alert/ws
           filters:
             - StripPrefix=1
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary, RETAIN_FIRST
+
 app:
   services:
     auth:

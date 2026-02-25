@@ -48,7 +48,7 @@ public class CoreActiveFloodSyncService {
             } else {
                 handleUpsert(event);
             }
-
+            log.info("[CoreSync] Xử lý sự kiện lifecycle thành công, eventId={}, type={}", event.getEventId(), event.getType());
             acknowledgment.acknowledge();
 
         } catch (Exception e) {

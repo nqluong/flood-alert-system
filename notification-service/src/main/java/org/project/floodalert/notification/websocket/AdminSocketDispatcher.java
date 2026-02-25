@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.notification.dto.event.FloodLifecycleEvent;
 import org.project.floodalert.notification.dto.response.ProcessedSensorData;
+import org.project.floodalert.notification.dto.response.SensorTelemetryWsDTO;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -29,8 +30,19 @@ public class AdminSocketDispatcher {
     )
     public void onTelemetryEvent(ProcessedSensorData data, Acknowledgment acknowledgment) {
         try {
+            SensorTelemetryWsDTO slimDto = SensorTelemetryWsDTO.builder()
+                    .sensorId(data.getSensorId())
+                    .waterLevel(data.getWaterLevel())
+                    .lat(data.getLat())
+                    .lon(data.getLon())
+                    .battery(data.getBattery())
+                    .warningThreshold(data.getWarningThreshold())
+                    .dangerThreshold(data.getDangerThreshold())
+                    .timestamp(data.getTimestamp())
+                    .locationName(data.getLocationName())
+                    .build();
             // Đẩy thẳng dữ liệu telemetry xuống client đang subscribe /topic/admin/map/telemetry
-            simpMessagingTemplate.convertAndSend(TOPIC_TELEMETRY, data);
+            simpMessagingTemplate.convertAndSend(TOPIC_TELEMETRY, slimDto);
 
             log.info("[TELEMETRY] Đẩy WebSocket thành công sensorId={}, waterLevel={}cm, status={}",
                     data.getSensorId(), data.getWaterLevel(), data.getStatus());
@@ -46,7 +58,7 @@ public class AdminSocketDispatcher {
     @KafkaListener(
             topics = "${app.kafka.topic.lifecycle-events}",
             groupId = "${app.kafka.consumer.alert.group-id:admin-socket-alert-group}",
-            containerFactory = "notificationKafkaListenerContainerFactory"
+            containerFactory = "lifecycleKafkaListenerContainerFactory"
     )
     public void onLifecycleAlert(FloodLifecycleEvent event, Acknowledgment acknowledgment) {
         try {

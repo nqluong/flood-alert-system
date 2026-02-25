@@ -11,12 +11,12 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
-import org.springframework.kafka.support.converter.StringJsonMessageConverter;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @EnableKafka
 @Configuration
 public class KafkaConfig {
@@ -29,14 +29,16 @@ public class KafkaConfig {
         Map<String, Object> props = new HashMap<>();
         props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
         props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
+                "org.project.floodalert.floodcore.dto.event.FloodLifecycleEvent");
         props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
 
-        JsonDeserializer<Object> valueDeserializer = new JsonDeserializer<>(Object.class);
-        valueDeserializer.addTrustedPackages("*");
-        valueDeserializer.setUseTypeHeaders(false);
+        log.info("[KafkaConfig] Khởi tạo CoreConsumerFactory, bootstrap-servers: {}", bootstrapServers);
 
-        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), valueDeserializer);
+        return new DefaultKafkaConsumerFactory<>(props);
     }
 
     @Bean
@@ -44,9 +46,11 @@ public class KafkaConfig {
         ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(coreConsumerFactory());
-        factory.setRecordMessageConverter(new StringJsonMessageConverter());
         factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        // Dùng 3 thread song song để tăng throughput xử lý sự kiện lifecycle
         factory.setConcurrency(3);
+
+        log.info("[KafkaConfig] Khởi tạo CoreKafkaListenerContainerFactory thành công");
 
         return factory;
     }

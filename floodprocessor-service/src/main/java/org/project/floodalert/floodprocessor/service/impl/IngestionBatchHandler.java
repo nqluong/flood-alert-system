@@ -3,11 +3,9 @@ package org.project.floodalert.floodprocessor.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.project.floodalert.common.exception.AppException;
 import org.project.floodalert.floodprocessor.dto.request.SensorMessage;
 import org.project.floodalert.floodprocessor.dto.request.SensorRaw;
 import org.project.floodalert.floodprocessor.dto.response.EnrichedSensorData;
-import org.project.floodalert.floodprocessor.exception.ProcessorErrorCode;
 import org.project.floodalert.floodprocessor.service.BusinessLogicService;
 import org.project.floodalert.floodprocessor.service.RedisCacheService;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -30,10 +28,9 @@ public class IngestionBatchHandler {
             containerFactory = "batchKafkaListenerContainerFactory"
     )
     public void consumeBatch(List<SensorMessage> messages, Acknowledgment acknowledgment) {
-        log.info("=== BẮT ĐẦU XỬ LÝ BATCH: {} messages ===", messages.size());
 
         try {
-            // Parse & Extract
+            // Parse & Extract: lấy rawPayload từ SensorMessage rồi parse sang SensorRaw
             ParseResult parseResult = parseAndExtract(messages);
 
             if (parseResult.getValidDtos().isEmpty()) {
@@ -59,15 +56,14 @@ public class IngestionBatchHandler {
             // Handover to Module 2
             businessLogicService.process(enrichedDataList);
 
-            log.info("=== HOÀN THÀNH XỬ LÝ BATCH: {} messages thành công, {} messages bị drop ===",
-                    enrichedDataList.size(),
-                    messages.size() - enrichedDataList.size());
 
             acknowledgment.acknowledge();
 
         } catch (Exception e) {
-            log.error("Lỗi nghiêm trọng khi xử lý batch messages", e);
-            throw new AppException(ProcessorErrorCode.PROCESSING_FAILED);
+            Throwable rootCause = e.getCause() != null ? e.getCause() : e;
+            log.error("Lỗi nghiêm trọng khi xử lý batch {} messages. Root cause: {}",
+                    messages.size(), rootCause.getMessage(), e);
+            acknowledgment.acknowledge();
         }
     }
 
@@ -78,6 +74,7 @@ public class IngestionBatchHandler {
 
         for (SensorMessage message : messages) {
             try {
+                // Parse rawPayload JSON bên trong SensorMessage thành SensorRaw
                 SensorRaw dto = objectMapper.readValue(message.getRawPayload(), SensorRaw.class);
 
                 // Validate cơ bản
@@ -96,12 +93,10 @@ public class IngestionBatchHandler {
                 sensorIds.add(dto.getDeviceInfo().getSensorId());
 
             } catch (Exception e) {
-                log.error("Lỗi parse JSON message, bỏ qua: {}", e.getMessage());
+                log.error("Lỗi parse rawPayload từ SensorMessage sensorId={}, bỏ qua. Lỗi: {}",
+                        message.getSensorId(), e.getMessage());
             }
         }
-
-        log.info("Parse thành công {}/{} messages, thu thập {} sensor IDs duy nhất",
-                validDtos.size(), messages.size(), sensorIds.size());
 
         return new ParseResult(validDtos, sensorIds);
     }

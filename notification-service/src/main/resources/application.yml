@@ -1,5 +1,5 @@
 server:
-  port: 8084
+  port: 8085
 
 spring:
   application:
@@ -14,7 +14,7 @@ spring:
 app:
   kafka:
     topic:
-      processed-events: flood-processed-events
+      processed-events: flood-sensor-data-processed
       lifecycle-events: flood-lifecycle-events
     consumer:
       telemetry:

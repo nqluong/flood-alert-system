@@ -15,6 +15,7 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        default_schema: flood_core
   data:
     redis:
       host: ${REDIS_HOST:localhost}
