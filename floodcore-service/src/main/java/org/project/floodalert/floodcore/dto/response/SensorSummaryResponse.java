@@ -20,6 +20,8 @@ public class SensorSummaryResponse {
     BigDecimal lat;
     BigDecimal lon;
     String status;
+    BigDecimal warningThreshold;
+    BigDecimal dangerThreshold;
 
     // Thông tin trạng thái
     Integer batteryLevel;

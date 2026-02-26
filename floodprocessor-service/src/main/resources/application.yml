@@ -48,6 +48,7 @@ app:
       ingest: ${KAFKA_INGEST_TOPIC:iot-raw}
       output: ${KAFKA_OUTPUT_TOPIC:flood-sensor-data-processed}
       lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
+      sensor-health-sync: ${KAFKA_SENSOR_HEALTH_SYNC_TOPIC:sensor-health-sync}
     consumer:
         group-id: ${KAFKA_CONSUMER_GROUP_ID:flood-processor-group}
         concurrency: ${KAFKA_CONSUMER_CONCURRENCY:3}
@@ -60,3 +61,7 @@ app:
         group-id: ${KAFKA_AGGREGATOR_GROUP_ID:flood-event-aggregator-group}
         concurrency: ${KAFKA_AGGREGATOR_CONCURRENCY:3}
         max-poll-records: ${KAFKA_AGGREGATOR_MAX_POLL_RECORDS:100}
+
+  sensor-health:
+    # Khoảng thời gian tối thiểu giữa 2 lần đồng bộ health (ms) - mặc định 5 phút
+    sync-interval-ms: ${SENSOR_HEALTH_SYNC_INTERVAL_MS:300000}

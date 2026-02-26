@@ -6,7 +6,6 @@ import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.mapper.IotReadingMapper;
 import org.project.floodalert.floodprocessor.model.IoTReading;
 import org.project.floodalert.floodprocessor.service.DispatcherService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +18,7 @@ public class DispatcherServiceImpl implements DispatcherService {
     private final IotReadingMapper iotReadingMapper;
     private final DatabasePersister databasePersister;
     private final KafkaDispatcher kafkaDispatcher;
+    private final SensorHealthThrottlingService sensorHealthThrottlingService;
 
     @Override
     public void dispatch(List<ProcessedSensorData> processedSensorDataList) {
@@ -29,6 +29,7 @@ public class DispatcherServiceImpl implements DispatcherService {
         List<IoTReading> entities = iotReadingMapper.toEntities(processedSensorDataList);
         databasePersister.batchSave(entities);
         dispatchToKafka(processedSensorDataList);
+        syncSensorHealth(processedSensorDataList);
     }
 
     private void dispatchToKafka(List<ProcessedSensorData> processedDataList) {
@@ -56,4 +57,16 @@ public class DispatcherServiceImpl implements DispatcherService {
         }
     }
 
+
+    private void syncSensorHealth(List<ProcessedSensorData> processedDataList) {
+        for (ProcessedSensorData data : processedDataList) {
+            try {
+                sensorHealthThrottlingService.checkAndSend(data);
+            } catch (Exception e) {
+                log.error("Lỗi không mong đợi khi sync sensor health cho sensor: {}",
+                        data.getSensorId(), e);
+            }
+        }
+    }
 }
+

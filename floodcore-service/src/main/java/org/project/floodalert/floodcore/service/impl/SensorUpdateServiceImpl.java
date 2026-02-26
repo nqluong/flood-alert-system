@@ -3,8 +3,10 @@ package org.project.floodalert.floodcore.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.exception.AppException;
+import org.project.floodalert.floodcore.dto.request.ChangeStatusRequest;
 import org.project.floodalert.floodcore.dto.request.DeleteSensorRequest;
 import org.project.floodalert.floodcore.dto.request.UpdateSensorRequest;
+import org.project.floodalert.floodcore.dto.response.ChangeStatusResponse;
 import org.project.floodalert.floodcore.dto.response.DeleteSensorResponse;
 import org.project.floodalert.floodcore.dto.response.UpdateSensorResponse;
 import org.project.floodalert.floodcore.enums.SensorStatus;
@@ -32,6 +34,7 @@ public class SensorUpdateServiceImpl implements SensorUpdateService {
     private final SensorChangeTrackingService sensorChangeTrackingService;
     private final SensorLogService sensorLogService;
     private final SensorRedisCache sensorRedisCache;
+    private final SensorStatusTransitionService sensorStatusTransitionService;
 
 
     @Override
@@ -133,7 +136,6 @@ public class SensorUpdateServiceImpl implements SensorUpdateService {
             Map<String, Object> oldValue = createSensorSnapshot(sensor);
 
             // Update status thành DISABLED
-            String oldStatus = sensor.getStatus();
             sensor.setStatus(SensorStatus.DISABLED.name());
             Sensor updatedSensor = sensorRepository.save(sensor);
 
@@ -307,6 +309,16 @@ public class SensorUpdateServiceImpl implements SensorUpdateService {
                         "Không tìm thấy sensor với mã: " + sensorId));
 
         return restoreSensor(sensor.getId(), performedBy);
+    }
+
+    @Override
+    public ChangeStatusResponse changeStatus(UUID sensorId, ChangeStatusRequest request, UUID performedBy) {
+        return sensorStatusTransitionService.changeStatus(sensorId, request, performedBy);
+    }
+
+    @Override
+    public ChangeStatusResponse changeStatusBySensorId(String sensorId, ChangeStatusRequest request, UUID performedBy) {
+        return sensorStatusTransitionService.changeStatusBySensorId(sensorId, request, performedBy);
     }
 
     private void validateUpdateRequest(UpdateSensorRequest request, Sensor currentSensor) {

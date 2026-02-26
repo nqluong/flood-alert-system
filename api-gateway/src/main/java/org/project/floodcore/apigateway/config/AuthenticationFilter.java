@@ -39,9 +39,7 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/flood-alert/api/v1/auth/login",
             "/flood-alert/api/v1/auth/register",
-            "/flood-alert/api/v1/auth/refresh-token",
-            // WebSocket endpoint — SockJS handshake và STOMP Upgrade không mang Bearer token
-            // trong header chuẩn, nên bypass auth tại Gateway; bảo mật xử lý ở tầng service nếu cần
+            "/flood-alert/api/v1/auth/refresh",
             "/flood-alert/ws-admin",
             "/flood-alert/ws"
     );
@@ -64,7 +62,14 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         if (token == null) {
             return unauthorized(exchange.getResponse(), "Thiếu token xác thực");
         }
+        // onErrorResume chỉ bao quanh bước gọi auth-service để verify token,
+        // KHÔNG bao chain.filter() — lỗi downstream (service tắt, timeout...) sẽ
+        // propagate lên GlobalExceptionHandler thay vì bị nuốt ở đây.
         return verifyTokenWithAuthService(token)
+                .onErrorResume(error -> {
+                    log.error("Error verifying token with auth-service: {}", error.getMessage());
+                    return Mono.just(VerifyTokenResponse.invalid("Lỗi xác thực token"));
+                })
                 .flatMap(response -> {
                     if (response.isValid()) {
                         ServerHttpRequest mutatedRequest = exchange.getRequest()
@@ -80,10 +85,6 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
                                 response.getInvalidReason() != null ?
                                         response.getInvalidReason() : "Token không hợp lệ");
                     }
-                })
-                .onErrorResume(error -> {
-                    log.error("Error verifying token: {}", error.getMessage());
-                    return unauthorized(exchange.getResponse(), "Lỗi xác thực token");
                 });
     }
 

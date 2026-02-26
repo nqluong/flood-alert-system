@@ -20,8 +20,6 @@ public class ProcessedSensorData extends EnrichedSensorData{
     String readingId;
     String rawPayload;
 
-    Integer signalStrength;
-    Double temperature;
     Double humidity;
 
     @Builder.Default

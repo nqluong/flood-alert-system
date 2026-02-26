@@ -12,6 +12,7 @@ spring:
     hibernate:
       ddl-auto: none
     show-sql: false
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: true
@@ -38,7 +39,12 @@ app:
   kafka:
     topic:
       lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
+      sensor-health-sync: ${KAFKA_SENSOR_HEALTH_SYNC_TOPIC:sensor-health-sync}
     consumer:
       core-sync:
         group-id: ${KAFKA_CORE_SYNC_GROUP_ID:core-map-sync-group}
+      sensor-health:
+        group-id: ${KAFKA_SENSOR_HEALTH_GROUP_ID:sensor-health-batch-group}
+        concurrency: ${KAFKA_SENSOR_HEALTH_CONCURRENCY:3}
+        max-poll-records: ${KAFKA_SENSOR_HEALTH_MAX_POLL_RECORDS:50}
 

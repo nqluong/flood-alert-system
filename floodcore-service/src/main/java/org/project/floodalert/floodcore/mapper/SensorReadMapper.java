@@ -25,6 +25,8 @@ public class SensorReadMapper {
                 .locationName(sensor.getLocationName())
                 .lat(sensor.getLat())
                 .lon(sensor.getLon())
+                .dangerThreshold(sensor.getDangerThreshold())
+                .warningThreshold(sensor.getWarningThreshold())
                 .status(sensor.getStatus())
                 .batteryLevel(sensor.getBatteryLevel())
                 .signalStrength(sensor.getSignalStrength())

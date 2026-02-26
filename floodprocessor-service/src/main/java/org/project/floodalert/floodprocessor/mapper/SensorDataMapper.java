@@ -14,6 +14,8 @@ public class SensorDataMapper {
         return ProcessedSensorData.builder()
                 // Các trường từ EnrichedSensorData
                 .sensorId(enrichedData.getSensorId())
+                .firmwareVer(enrichedData.getFirmwareVer())
+                .model(enrichedData.getModel())
                 .waterLevel(enrichedData.getWaterLevel())
                 .lat(enrichedData.getLat())
                 .lon(enrichedData.getLon())
@@ -22,6 +24,9 @@ public class SensorDataMapper {
                 .warningThreshold(enrichedData.getWarningThreshold())
                 .dangerThreshold(enrichedData.getDangerThreshold())
                 .locationName(enrichedData.getLocationName())
+                .deviceStatus(enrichedData.getDeviceStatus())
+                .temperature(enrichedData.getTemperature())
+                .signalStrength(enrichedData.getSignalStrength())
                 .status(status)
                 .build();
     }

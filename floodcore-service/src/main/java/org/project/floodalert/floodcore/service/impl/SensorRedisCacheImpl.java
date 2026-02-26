@@ -332,6 +332,7 @@ public class SensorRedisCacheImpl implements SensorRedisCache {
 
     private boolean isBlacklistStatus(String status) {
         return "DISABLED".equals(status) ||
+                "MAINTENANCE".equals(status) ||
                 "DELETED".equals(status) ||
                 "OFFLINE".equals(status);
     }

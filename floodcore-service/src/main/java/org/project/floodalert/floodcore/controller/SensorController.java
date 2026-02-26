@@ -8,6 +8,7 @@ import org.project.floodalert.common.dto.response.PageResponse;
 import org.project.floodalert.common.security.SecurityContextUtils;
 import org.project.floodalert.common.security.annotation.RequireOwnershipOrAdmin;
 import org.project.floodalert.floodcore.dto.request.CreateSensorRequest;
+import org.project.floodalert.floodcore.dto.request.ChangeStatusRequest;
 import org.project.floodalert.floodcore.dto.request.DeleteSensorRequest;
 import org.project.floodalert.floodcore.dto.request.SensorFilterRequest;
 import org.project.floodalert.floodcore.dto.request.UpdateSensorRequest;
@@ -379,6 +380,61 @@ public class SensorController {
                 sensorId, userId);
 
         return ResponseEntity.ok(ApiResponse.<DeleteSensorResponse>builder()
+                .success(true)
+                .code(HttpStatus.OK.value())
+                .data(response)
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+
+    /**
+     * PATCH /api/v1/sensors/{id}/status
+     *
+     * @param id      UUID của sensor
+     * @param request Request chứa trạng thái mới và lý do
+     * @return Response sau khi chuyển trạng thái
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ApiResponse<ChangeStatusResponse>> changeStatus(
+            @PathVariable(name = "id") UUID id,
+            @Valid @RequestBody ChangeStatusRequest request) {
+
+        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
+
+        ChangeStatusResponse response = sensorUpdateService.changeStatus(id, request, userId);
+
+        return ResponseEntity.ok(ApiResponse.<ChangeStatusResponse>builder()
+                .success(true)
+                .code(HttpStatus.OK.value())
+                .data(response)
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+
+    /**
+     * PATCH /api/v1/sensors/by-sensor-id/{sensorId}/status
+     *
+     * @param sensorId Mã sensor (VD: SENS-HAN-01)
+     * @param request  Request chứa trạng thái mới và lý do
+     * @return Response sau khi chuyển trạng thái
+     */
+    @PreAuthorize("hasRole('ADMIN')")
+    @PatchMapping("/by-sensor-id/{sensorId}/status")
+    public ResponseEntity<ApiResponse<ChangeStatusResponse>> changeStatusBySensorId(
+            @PathVariable(name = "sensorId") String sensorId,
+            @Valid @RequestBody ChangeStatusRequest request) {
+
+        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
+        log.info("API PATCH /api/v1/sensors/by-sensor-id/{}/status - Chuyển status sang '{}' bởi user: {}",
+                sensorId, request.getNewStatus(), userId);
+
+        ChangeStatusResponse response = sensorUpdateService.changeStatusBySensorId(sensorId, request, userId);
+
+        log.info("API PATCH /api/v1/sensors/by-sensor-id/{}/status - Chuyển trạng thái thành công: {} → {}",
+                sensorId, response.getPreviousStatus(), response.getCurrentStatus());
+
+        return ResponseEntity.ok(ApiResponse.<ChangeStatusResponse>builder()
                 .success(true)
                 .code(HttpStatus.OK.value())
                 .data(response)

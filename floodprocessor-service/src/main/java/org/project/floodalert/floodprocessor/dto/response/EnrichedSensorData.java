@@ -11,13 +11,21 @@ import lombok.experimental.SuperBuilder;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class EnrichedSensorData {
     String sensorId;
+    String model;
+    String firmwareVer;
+
     Double waterLevel;
     Double lat;
     Double lon;
-    Double battery;
     Long timestamp;
 
     Double warningThreshold;
     Double dangerThreshold;
     String locationName;
+
+    Double battery;
+    String deviceStatus;
+    Double temperature;
+    Integer signalStrength;
+
 }

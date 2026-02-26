@@ -1,7 +1,9 @@
 package org.project.floodalert.floodcore.service;
 
+import org.project.floodalert.floodcore.dto.request.ChangeStatusRequest;
 import org.project.floodalert.floodcore.dto.request.DeleteSensorRequest;
 import org.project.floodalert.floodcore.dto.request.UpdateSensorRequest;
+import org.project.floodalert.floodcore.dto.response.ChangeStatusResponse;
 import org.project.floodalert.floodcore.dto.response.DeleteSensorResponse;
 import org.project.floodalert.floodcore.dto.response.UpdateSensorResponse;
 
@@ -74,4 +76,25 @@ public interface SensorUpdateService {
      * Restore sensor theo sensorId
      */
     DeleteSensorResponse restoreSensorBySensorId(String sensorId, UUID performedBy);
+
+    /**
+     * Chuyển đổi trạng thái (device status) của sensor theo UUID.
+     * Tuân thủ ma trận chuyển đổi hợp lệ, ghi audit log và đồng bộ Redis.
+     *
+     * @param sensorId    UUID của sensor
+     * @param request     Request chứa trạng thái mới và lý do
+     * @param performedBy UUID người thực hiện
+     * @return Response chứa thông tin sau khi chuyển trạng thái
+     */
+    ChangeStatusResponse changeStatus(UUID sensorId, ChangeStatusRequest request, UUID performedBy);
+
+    /**
+     * Chuyển đổi trạng thái sensor theo sensorId (mã chuỗi).
+     *
+     * @param sensorId    Mã sensor (VD: SENS-HAN-01)
+     * @param request     Request chứa trạng thái mới và lý do
+     * @param performedBy UUID người thực hiện
+     * @return Response chứa thông tin sau khi chuyển trạng thái
+     */
+    ChangeStatusResponse changeStatusBySensorId(String sensorId, ChangeStatusRequest request, UUID performedBy);
 }

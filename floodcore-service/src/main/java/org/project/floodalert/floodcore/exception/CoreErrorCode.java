@@ -14,6 +14,9 @@ public enum CoreErrorCode implements BaseErrorCode {
     INVALID_COORDINATES(4004, "Tọa độ không hợp lệ", HttpStatus.BAD_REQUEST),
     SENSOR_ALREADY_DELETED(4005, "Cảm biến đã bị xóa trước đó", HttpStatus.CONFLICT),
     SENSOR_NOT_DELETED(4006, "Cảm biến không ở trạng thái deleted", HttpStatus.BAD_REQUEST),
+    INVALID_STATUS_TRANSITION(4007, "Chuyển đổi trạng thái không hợp lệ", HttpStatus.BAD_REQUEST),
+    SENSOR_STATUS_SAME(4008, "Trạng thái sensor không thay đổi", HttpStatus.CONFLICT),
+    INVALID_SENSOR_STATUS(4009, "Trạng thái sensor không hợp lệ", HttpStatus.BAD_REQUEST),
 
     REDIS_SYNC_FAILED(5001, "Đồng bộ dữ liệu Redis thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
 

@@ -139,6 +139,8 @@ public class IngestionBatchHandler {
                 // Build EnrichedSensorData
                 EnrichedSensorData enriched = EnrichedSensorData.builder()
                         .sensorId(sensorId)
+                        .firmwareVer(dto.getDeviceInfo().getFirmwareVer() != null ? dto.getDeviceInfo().getFirmwareVer() : "Unknown")
+                        .model(dto.getDeviceInfo().getModel() != null ? dto.getDeviceInfo().getModel() : "Unknown")
                         .waterLevel(dto.getTelemetry().getWaterLevel())
                         .lat(dto.getTelemetry().getLat())
                         .lon(dto.getTelemetry().getLon())
@@ -147,6 +149,9 @@ public class IngestionBatchHandler {
                         .warningThreshold(warningLevel)
                         .dangerThreshold(dangerLevel)
                         .locationName(locationName)
+                        .temperature(dto.getHealth().getTemperature() != null ? dto.getHealth().getTemperature() : null)
+                        .signalStrength(dto.getHealth().getSignalStrength() != null ? dto.getHealth().getSignalStrength() : null)
+                        .deviceStatus(dto.getHealth().getStatus() != null ? dto.getHealth().getStatus() : "UNKNOWN")
                         .build();
 
                 enrichedList.add(enriched);
