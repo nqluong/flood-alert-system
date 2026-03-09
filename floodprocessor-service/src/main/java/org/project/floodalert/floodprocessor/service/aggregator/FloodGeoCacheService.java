@@ -11,7 +11,7 @@ public interface FloodGeoCacheService {
      *
      * @param floodEvent sự kiện ngập đã được persist (có đầy đủ eventId, lat, lon, …)
      */
-    void syncActiveFloodEvent(FloodEvent floodEvent);
+//    void syncActiveFloodEvent(FloodEvent floodEvent);
 
     /**
      * Xóa một sự kiện ngập đã RESOLVED khỏi Redis (ZREM + HDEL).
@@ -19,5 +19,5 @@ public interface FloodGeoCacheService {
      *
      * @param eventId ID của flood event cần xóa khỏi cache
      */
-    void removeResolvedFloodEvent(String eventId);
+//    void removeResolvedFloodEvent(String eventId);
 }

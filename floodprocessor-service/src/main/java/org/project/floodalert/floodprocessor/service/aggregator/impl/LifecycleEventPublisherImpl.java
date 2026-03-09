@@ -11,11 +11,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.concurrent.CompletableFuture;
 
-/**
- * Triển khai {@link LifecycleEventPublisher}.
- * Serialize FloodLifecycleEvent thành JSON và bắn ra Kafka topic "flood-lifecycle-events".
- * Sử dụng eventId làm Kafka message key để đảm bảo ordering theo từng sự kiện.
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor

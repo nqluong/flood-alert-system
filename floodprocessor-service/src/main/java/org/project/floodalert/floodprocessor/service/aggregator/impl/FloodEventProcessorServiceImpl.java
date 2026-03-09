@@ -21,7 +21,6 @@ import java.util.List;
  * Điều phối tuần tự 3 bước cho mỗi bản ghi sensor:
  * <ol>
  *   <li>Xử lý DB (kịch bản A/B/C) và back-link IoTReading</li>
- *   <li>Đồng bộ Redis GEO Cache cho Mobile App</li>
  *   <li>Publish Lifecycle Event ra Kafka (nếu cần)</li>
  * </ol>
  */
@@ -31,7 +30,7 @@ import java.util.List;
 public class FloodEventProcessorServiceImpl implements FloodEventProcessorService {
 
     private final FloodEventDbService floodEventDbService;
-    private final FloodGeoCacheService floodGeoCacheService;
+//    private final FloodGeoCacheService floodGeoCacheService;
     private final LifecycleEventPublisher lifecycleEventPublisher;
 
 
@@ -59,7 +58,7 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
             FloodEvent floodEvent = dbResult.floodEvent();
 
             // Đồng bộ Redis Cache
-            syncRedisCache(data.getStatus(), floodEvent);
+//            syncRedisCache(data.getStatus(), floodEvent);
 
             // Publish Lifecycle Event (nếu cần)
             if (dbResult.shouldPublish()) {
@@ -115,15 +114,15 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
      * - DANGER/WARNING (kịch bản B hoặc C): thêm/cập nhật vào GEO set và Hash.
      * - SAFE (kịch bản A): xóa khỏi GEO set và Hash.
      */
-    private void syncRedisCache(FloodStatus newStatus, FloodEvent floodEvent) {
-        if (newStatus == FloodStatus.SAFE) {
-            // Kịch bản A – Nước rút: xóa khỏi cache
-            floodGeoCacheService.removeResolvedFloodEvent(floodEvent.getEventId());
-        } else {
-            // Kịch bản B hoặc C – Đang ngập: thêm/cập nhật cache
-            floodGeoCacheService.syncActiveFloodEvent(floodEvent);
-        }
-    }
+//    private void syncRedisCache(FloodStatus newStatus, FloodEvent floodEvent) {
+//        if (newStatus == FloodStatus.SAFE) {
+//            // Kịch bản A – Nước rút: xóa khỏi cache
+//            floodGeoCacheService.removeResolvedFloodEvent(floodEvent.getEventId());
+//        } else {
+//            // Kịch bản B hoặc C – Đang ngập: thêm/cập nhật cache
+//            floodGeoCacheService.syncActiveFloodEvent(floodEvent);
+//        }
+//    }
 
     /**
      * Xây dựng {@link FloodLifecycleEvent} từ kết quả DB để publish ra Kafka.

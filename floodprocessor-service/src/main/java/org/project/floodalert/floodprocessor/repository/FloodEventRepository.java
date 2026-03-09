@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -37,4 +38,13 @@ public interface FloodEventRepository extends JpaRepository<FloodEvent, UUID> {
     Optional<FloodEvent> findActiveEventBySensorId(
             @Param("sensorId") String sensorId,
             @Param("now") LocalDateTime now);
+
+
+    @Query(value = """
+            SELECT * FROM flood_events e
+            WHERE e.source IN ('SENSOR', 'IOT')
+                AND e.status IN ('PENDING', 'CONFIRMED')
+            """, nativeQuery = true)
+    List<FloodEvent> findActiveIotEvents();
+
 }
