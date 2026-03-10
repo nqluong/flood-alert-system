@@ -43,6 +43,7 @@ spring:
               /flood-alert/api/v1/devices/**,
               /flood-alert/api/v1/sensors/**,
               /flood-alert/api/v1/admin/floods/**,
+              /flood-alert/api/v1/core/floods/**,
           filters:
             - StripPrefix=1
 

@@ -13,9 +13,13 @@ redis:
       sensor-detail: "cache:sensor:detail:{sensorId}"
       map-all: "cache:map:all_sensors"
       map-active: "cache:map:active_sensors"
+    flood:
+      geo-index: "active_floods_geo"
+      detail: "flood_detail:{eventId}"
   ttl:
     cache-default: 3600  # in seconds
     sensor-info: -1
     map-cache: 300
     sensor-list: 20
     sensor-detail: 3600
+    flood-detail: 86400  # 24h in seconds

@@ -16,6 +16,7 @@ public class RedisKeyProperties {
         private SensorKeys sensor;
         private MapsKeys maps;
         private CacheKeys cache;
+        private FloodKeys flood;
     }
 
     @Data
@@ -57,11 +58,24 @@ public class RedisKeyProperties {
     }
 
     @Data
+    public static class FloodKeys {
+        /** Redis GEO key lưu spatial index – không có placeholder */
+        private String geoIndex;
+        /** Redis Hash key prefix cho flood detail – có {eventId} */
+        private String detail;
+
+        public String getDetailKey(String eventId) {
+            return detail.replace("{eventId}", eventId);
+        }
+    }
+
+    @Data
     public static class Ttl {
         private long cacheDefault;
         private long sensorInfo;
         private long mapCache;
         private long sensorList;
         private long sensorDetail;
+        private long floodDetail;
     }
 }

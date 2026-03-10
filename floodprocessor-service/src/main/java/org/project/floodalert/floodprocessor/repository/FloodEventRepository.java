@@ -11,10 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/**
- * Repository cho entity FloodEvent.
- * Cung cấp các truy vấn đặc thù phục vụ Module 5 (Event Aggregator).
- */
 @Repository
 public interface FloodEventRepository extends JpaRepository<FloodEvent, UUID> {
 

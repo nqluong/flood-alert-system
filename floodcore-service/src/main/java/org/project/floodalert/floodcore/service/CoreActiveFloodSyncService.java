@@ -13,18 +13,16 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CoreActiveFloodSyncService {
 
     private final CoreActiveFloodRepository coreActiveFloodRepository;
+    private final FloodGeoCache             floodGeoCache;
 
     /**
      * Nhận sự kiện vòng đời ngập lụt từ Kafka topic flood-lifecycle-events.
-     * - RESOLVED  → Xóa bản ghi khỏi bảng (nước đã rút).
-     * - CREATED / ESCALATED → UPSERT bản ghi (thêm mới hoặc cập nhật).
      *
      * @param event          payload sự kiện ngập lụt đã deserialize
      * @param acknowledgment dùng để commit offset thủ công sau khi xử lý xong
@@ -37,7 +35,7 @@ public class CoreActiveFloodSyncService {
     )
     public void onFloodLifecycleEvent(FloodLifecycleEvent event, Acknowledgment acknowledgment) {
         if (event == null) {
-            log.warn("[CoreSync] Nhận được sự kiện null, bỏ qua");
+            log.warn("[FloodListener] Nhận được sự kiện null, bỏ qua");
             acknowledgment.acknowledge();
             return;
         }
@@ -46,43 +44,53 @@ public class CoreActiveFloodSyncService {
             if (LifecycleEventType.RESOLVED.equals(event.getType())) {
                 handleResolved(event);
             } else {
+                // CREATED hoặc ESCALATED
                 handleUpsert(event);
             }
-            log.info("[CoreSync] Xử lý sự kiện lifecycle thành công, eventId={}, type={}", event.getEventId(), event.getType());
+
+            log.info("[FloodListener] Xử lý thành công eventId={}, type={}",
+                    event.getEventId(), event.getType());
             acknowledgment.acknowledge();
 
         } catch (Exception e) {
-            log.error("[CoreSync] Lỗi khi xử lý sự kiện eventId={}: {}", event.getEventId(), e.getMessage(), e);
+            log.error("[FloodListener] Lỗi xử lý eventId={}: {}", event.getEventId(), e.getMessage(), e);
+            // Vẫn acknowledge để tránh replay vô tận; có thể đẩy sang DLQ nếu cần
             acknowledgment.acknowledge();
         }
     }
 
-
     private void handleResolved(FloodLifecycleEvent event) {
+        // Cập nhật / xóa DB
         if (coreActiveFloodRepository.existsById(event.getEventId())) {
             coreActiveFloodRepository.deleteById(event.getEventId());
+            log.debug("[FloodListener] Đã xóa DB eventId={}", event.getEventId());
         } else {
-            log.warn("[CoreSync] Không tìm thấy bản ghi để xóa, eventId={}", event.getEventId());
+            log.warn("[FloodListener] Không tìm thấy bản ghi DB để xóa, eventId={}", event.getEventId());
         }
+
+        // Xóa Redis cache
+        floodGeoCache.removeFloodCache(event.getEventId());
     }
 
     private void handleUpsert(FloodLifecycleEvent event) {
+        // 1. UPSERT vào PostgreSQL
         CoreActiveFlood flood = coreActiveFloodRepository
                 .findById(event.getEventId())
-                .orElseGet(() -> {
-                    return CoreActiveFlood.builder()
-                            .eventId(event.getEventId())
-                            .build();
-                });
+                .orElseGet(() -> CoreActiveFlood.builder()
+                        .eventId(event.getEventId())
+                        .build());
 
         flood.setLat(event.getLat() != null ? BigDecimal.valueOf(event.getLat()) : null);
         flood.setLon(event.getLon() != null ? BigDecimal.valueOf(event.getLon()) : null);
         flood.setLocationDescription(event.getLocation());
         flood.setWaterLevel(event.getWaterLevel() != null ? BigDecimal.valueOf(event.getWaterLevel()) : null);
         flood.setSeverityLevel(event.getSeverityLevel());
-
         flood.setStatus("CONFIRMED");
 
         coreActiveFloodRepository.save(flood);
+        log.debug("[FloodListener] Đã upsert DB eventId={}", event.getEventId());
+
+        // 2. Cập nhật Redis cache
+        floodGeoCache.cacheActiveFlood(event);
     }
 }
