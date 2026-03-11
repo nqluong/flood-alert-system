@@ -49,6 +49,7 @@ app:
       output: ${KAFKA_OUTPUT_TOPIC:flood-sensor-data-processed}
       lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
       sensor-health-sync: ${KAFKA_SENSOR_HEALTH_SYNC_TOPIC:sensor-health-sync}
+      user-report: ${KAFKA_USER_REPORT_TOPIC:user-report-events}
     consumer:
         group-id: ${KAFKA_CONSUMER_GROUP_ID:flood-processor-group}
         concurrency: ${KAFKA_CONSUMER_CONCURRENCY:3}
@@ -65,3 +66,10 @@ app:
   sensor-health:
     # Khoảng thời gian tối thiểu giữa 2 lần đồng bộ health (ms) - mặc định 5 phút
     sync-interval-ms: ${SENSOR_HEALTH_SYNC_INTERVAL_MS:300000}
+
+  # ── Consumer riêng cho luồng báo cáo người dùng ──────────────────────────
+  kafka:
+    user-report:
+      consumer:
+        group-id: ${KAFKA_USER_REPORT_CONSUMER_GROUP_ID:user-report-processor-group}
+        concurrency: ${KAFKA_USER_REPORT_CONCURRENCY:2}
