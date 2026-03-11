@@ -18,6 +18,9 @@ public enum CoreErrorCode implements BaseErrorCode {
     SENSOR_STATUS_SAME(4008, "Trạng thái sensor không thay đổi", HttpStatus.CONFLICT),
     INVALID_SENSOR_STATUS(4009, "Trạng thái sensor không hợp lệ", HttpStatus.BAD_REQUEST),
 
+    USER_REPORT_NOT_FOUND(4010, "Không tìm thấy báo cáo", HttpStatus.NOT_FOUND),
+    USER_REPORT_ALREADY_REVIEWED(4011, "Báo cáo đã được xét duyệt trước đó", HttpStatus.CONFLICT),
+
     REDIS_SYNC_FAILED(5001, "Đồng bộ dữ liệu Redis thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
 
     DATABASE_ERROR(5002, "Lỗi cơ sở dữ liệu", HttpStatus.INTERNAL_SERVER_ERROR),

@@ -40,6 +40,7 @@ app:
     topic:
       lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
       sensor-health-sync: ${KAFKA_SENSOR_HEALTH_SYNC_TOPIC:sensor-health-sync}
+      user-report: ${KAFKA_USER_REPORT_TOPIC:user-report-events}
     consumer:
       core-sync:
         group-id: ${KAFKA_CORE_SYNC_GROUP_ID:core-map-sync-group}

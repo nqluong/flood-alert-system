@@ -3,15 +3,17 @@ package org.project.floodalert.floodcore.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.dto.response.ApiResponse;
+import org.project.floodalert.common.security.SecurityContextUtils;
+import org.project.floodalert.floodcore.dto.request.UserReportRequest;
 import org.project.floodalert.floodcore.dto.response.ActiveFloodResponse;
+import org.project.floodalert.floodcore.dto.response.UserReportResponse;
 import org.project.floodalert.floodcore.service.FloodGeoCache;
+import org.project.floodalert.floodcore.service.UserReportService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -20,6 +22,7 @@ import java.util.List;
 public class MapApiController {
 
     private final FloodGeoCache floodGeoCache;
+    private final UserReportService userReportService;
 
     /**
      * Lấy danh sách điểm ngập trong bán kính quanh vị trí người dùng.
@@ -40,6 +43,13 @@ public class MapApiController {
         List<ActiveFloodResponse> floods = floodGeoCache.findFloodsInRadius(lat, lon, radius);
 
         return ResponseEntity.ok(ApiResponse.success(floods));
+    }
+
+    @PostMapping("/user-report")
+    public ResponseEntity<ApiResponse<UserReportResponse>> getUserReport(@RequestBody UserReportRequest userReportRequest) {
+        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
+        UserReportResponse userReportResponse = userReportService.submitUserReport(userReportRequest, userId);
+        return ResponseEntity.ok(ApiResponse.success(userReportResponse));
     }
 }
 

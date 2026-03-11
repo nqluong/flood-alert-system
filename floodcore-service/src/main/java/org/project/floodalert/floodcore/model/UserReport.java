@@ -22,7 +22,7 @@ public class UserReport {
     @Id
     @Column(name = "id", updatable = false, nullable = false)
     @GeneratedValue(strategy = GenerationType.UUID)
-    String id;
+    UUID id;
 
     @Column(name = "report_id", nullable = false, unique = true, length = 50)
     String reportId;
@@ -33,9 +33,8 @@ public class UserReport {
     @Column(name = "description", columnDefinition = "TEXT")
     String description;
 
-    @Type(StringArrayType.class)
-    @Column(name = "image_urls", columnDefinition = "text[]")
-    String[] imageUrls;
+    @Column(name = "image_urls", columnDefinition = "TEXT")
+    String imageUrls;
 
     @Column(name = "severity_level", length = 20)
     String severityLevel;
