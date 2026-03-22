@@ -13,6 +13,8 @@ import org.project.floodalert.auth.dto.response.UserResponse;
 import org.project.floodalert.auth.enums.AuthProvider;
 import org.project.floodalert.auth.enums.UserStatus;
 import org.project.floodalert.auth.model.User;
+import org.project.floodalert.auth.model.UserProfile;
+import org.project.floodalert.auth.repository.UserProfileRepository;
 import org.project.floodalert.auth.repository.UserRepository;
 import org.project.floodalert.auth.repository.UserRoleRepository;
 import org.project.floodalert.auth.security.JwtTokenGenerator;
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -37,6 +40,7 @@ public class SocialAuthServiceImpl implements SocialAuthService {
 
     FirebaseAuthService firebaseAuthService;
     UserRepository userRepository;
+    UserProfileRepository userProfileRepository;
     UserRoleRepository userRoleRepository;
     JwtTokenGenerator jwtTokenGenerator;
     JwtProperties jwtProperties;
@@ -58,7 +62,8 @@ public class SocialAuthServiceImpl implements SocialAuthService {
         validateUserStatus(user);
 
         List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
-        String accessToken = jwtTokenGenerator.generateAccessToken(user, roles);
+        UserProfile profile = getOrCreateProfile(user.getId(), firebaseUserInfo.getFullName(), firebaseUserInfo.getAvatarUrl());
+        String accessToken = jwtTokenGenerator.generateAccessToken(user, roles, profile.getFullName());
         String refreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
         updateLastLogin(user);
         auditLogger.logLogin(
@@ -104,13 +109,12 @@ public class SocialAuthServiceImpl implements SocialAuthService {
         User newUser = User.builder()
                 .firebaseUid(firebaseUserInfo.getFirebaseUid())
                 .email(firebaseUserInfo.getEmail())
-                .fullName(firebaseUserInfo.getFullName())
-                .avatarUrl(firebaseUserInfo.getAvatarUrl())
                 .authProvider(authProvider)
                 .status(UserStatus.ACTIVE)
                 .build();
 
         User savedUser = userRepository.save(newUser);
+        getOrCreateProfile(savedUser.getId(), firebaseUserInfo.getFullName(), firebaseUserInfo.getAvatarUrl());
         assignDefaultRole(savedUser.getId());
 
         auditLogger.logUserRegistration(
@@ -129,15 +133,6 @@ public class SocialAuthServiceImpl implements SocialAuthService {
             user.setFirebaseUid(firebaseUserInfo.getFirebaseUid());
             updated = true;
         }
-        if(firebaseUserInfo.getAvatarUrl() == null || !firebaseUserInfo.getAvatarUrl().equals(user.getAvatarUrl())) {
-            user.setAvatarUrl(firebaseUserInfo.getAvatarUrl());
-            updated = true;
-        }
-        if(firebaseUserInfo.getFullName() == null || !firebaseUserInfo.getFullName().equals(user.getFullName())) {
-            user.setFullName(firebaseUserInfo.getFullName());
-            updated = true;
-        }
-
         AuthProvider newProvider = mapFirebaseProviderToAuthProvider(firebaseUserInfo.getProvider());
         if(user.getAuthProvider() != newProvider) {
             user.setAuthProvider(newProvider);
@@ -154,25 +149,29 @@ public class SocialAuthServiceImpl implements SocialAuthService {
             log.info("User updated successfully: userId={}", user.getId());
         }
 
+        updateUserProfile(user.getId(), firebaseUserInfo.getFullName(), firebaseUserInfo.getAvatarUrl());
+
         return user;
 
     }
 
     private AuthProvider mapFirebaseProviderToAuthProvider(String provider) {
         return switch (provider.toLowerCase()){
-            case "GOOGLE" -> AuthProvider.GOOGLE;
-            case "FACEBOOK" -> AuthProvider.FACEBOOK;
+            case "google" -> AuthProvider.GOOGLE;
+            case "facebook" -> AuthProvider.FACEBOOK;
             default -> AuthProvider.LOCAL;
         };
     }
 
     private LoginResponse buildLoginResponse(String accessToken, String refreshToken, User user, List<String> roles) {
+        UserProfile profile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+
         UserResponse userResponse = UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .fullName(user.getFullName())
+                .fullName(profile != null ? profile.getFullName() : null)
                 .phoneNumber(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(profile != null ? profile.getAvatarUrl() : null)
                 .status(user.getStatus().name())
                 .roles(roles)
                 .build();
@@ -211,5 +210,37 @@ public class SocialAuthServiceImpl implements SocialAuthService {
             throw new AppException(ErrorCode.INTERNAL_SERVER_ERROR,
                     "Không thể gán quyền cho người dùng");
         }
+    }
+
+    private UserProfile getOrCreateProfile(UUID userId, String fullName, String avatarUrl) {
+        return userProfileRepository.findByUserId(userId)
+                .map(profile -> updateUserProfile(profile, fullName, avatarUrl))
+                .orElseGet(() -> userProfileRepository.save(UserProfile.builder()
+                        .userId(userId)
+                        .fullName(fullName)
+                        .avatarUrl(avatarUrl)
+                        .reputationScore(50)
+                        .totalReportsSubmitted(0)
+                        .build()));
+    }
+
+    private void updateUserProfile(UUID userId, String fullName, String avatarUrl) {
+        userProfileRepository.findByUserId(userId)
+                .ifPresent(profile -> updateUserProfile(profile, fullName, avatarUrl));
+    }
+
+    private UserProfile updateUserProfile(UserProfile profile, String fullName, String avatarUrl) {
+        boolean changed = false;
+
+        if (fullName != null && !fullName.equals(profile.getFullName())) {
+            profile.setFullName(fullName);
+            changed = true;
+        }
+        if (avatarUrl != null && !avatarUrl.equals(profile.getAvatarUrl())) {
+            profile.setAvatarUrl(avatarUrl);
+            changed = true;
+        }
+
+        return changed ? userProfileRepository.save(profile) : profile;
     }
 }

@@ -35,11 +35,11 @@ public class FloodEvent {
     @Column(name = "source_id", length = 100)
     String sourceId;
 
-    @Column(name = "lat", nullable = false, precision = 10, scale = 8)
-    BigDecimal lat;
+    @Column(name = "lat", nullable = false)
+    Double lat;
 
-    @Column(name = "lon", nullable = false, precision = 10, scale = 8)
-    BigDecimal lon;
+    @Column(name = "lon", nullable = false)
+    Double lon;
 
     @Column(name = "location_description", columnDefinition = "TEXT")
     String locationDescription;

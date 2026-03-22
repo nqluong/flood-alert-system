@@ -2,29 +2,39 @@ package org.project.floodalert.floodprocessor.service.scoring;
 
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.dto.request.ReportMessage;
+import org.project.floodalert.floodprocessor.service.UserProfileCacheService;
 import org.springframework.stereotype.Component;
 
 /**
  * Strategy chấm điểm dựa trên điểm uy tín của người dùng (User Reputation).
  *
- * <p><b>TODO:</b> Lấy {@code trustScore} từ bảng {@code trust_scores} hoặc cache Redis
+ * <p>Lấy {@code reputation score} từ cache Redis qua {@link UserProfileCacheService}
  * theo {@link ReportMessage#getUserId()} để phản ánh lịch sử báo cáo chính xác của user.</p>
  *
- * <p>Trọng số tối đa: <b>10 điểm</b>.</p>
+ * <p><b>Tính điểm:</b> reputation_score / 100 * 10, tối đa <b>10 điểm</b>.</p>
  */
 @Slf4j
 @Component
 public class UserReputationScoringStrategy implements ReportScoringStrategy {
+
+    private final UserProfileCacheService userProfileCacheService;
+
+    public UserReputationScoringStrategy(UserProfileCacheService userProfileCacheService) {
+        this.userProfileCacheService = userProfileCacheService;
+    }
 
     @Override
     public double calculateScore(ReportMessage msg) {
         log.debug("[SCORING][REPUTATION] Đang tra cứu uy tín cho userId={}, reportId={}",
                 msg.getUserId(), msg.getReportId());
 
-        // TODO: Tra cứu trust score của userId từ DB/Redis
-        double score = 10.0;
+        // Lấy điểm uy tín từ cache (fallback 3 lớp: Redis → Auth-Service → Default=50)
+        int reputationScore = userProfileCacheService.getReputationScore(msg.getUserId());
 
-        log.debug("[SCORING][REPUTATION] userId={} → score={}", msg.getUserId(), score);
+        double score = reputationScore / 100.0;
+
+        log.debug("[SCORING][REPUTATION] userId={}, reputationScore={} → scorePoints={}",
+                msg.getUserId(), reputationScore, score);
         return score;
     }
 

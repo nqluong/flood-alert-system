@@ -1,0 +1,7 @@
+redis:
+  keys:
+    user:
+      reputation: "user:reputation:{userId}"
+  ttl:
+    user:
+      reputation: 86400

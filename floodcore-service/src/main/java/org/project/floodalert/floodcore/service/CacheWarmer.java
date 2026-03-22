@@ -28,8 +28,6 @@ public class CacheWarmer implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        log.info("[CacheWarmer] Bắt đầu làm ấm cache (sensor + flood)...");
-        Instant start = Instant.now();
 
         CompletableFuture<Void> sensorTask = CompletableFuture
                 .runAsync(this::warmSensorCache)
@@ -47,14 +45,9 @@ public class CacheWarmer implements ApplicationRunner {
 
         // Chờ cả 2 task hoàn thành trước khi server nhận traffic
         CompletableFuture.allOf(sensorTask, floodTask).join();
-
-        log.info("[CacheWarmer] Hoàn thành làm ấm cache trong {}ms",
-                Duration.between(start, Instant.now()).toMillis());
     }
 
     private void warmSensorCache() {
-        log.info("[CacheWarmer][Sensor] Bắt đầu...");
-        Instant start = Instant.now();
 
         List<Sensor> sensors = sensorRepository.findAll();
 
@@ -64,15 +57,9 @@ public class CacheWarmer implements ApplicationRunner {
         }
 
         sensorSyncService.syncSensorsToCache(sensors);
-
-        log.info("[CacheWarmer][Sensor] Đồng bộ {} sensors trong {}ms",
-                sensors.size(), Duration.between(start, Instant.now()).toMillis());
     }
 
     private void warmFloodCache() {
-        log.info("[CacheWarmer][Flood] Bắt đầu...");
-        Instant start = Instant.now();
-
         // Xóa GEO index cũ để tránh dữ liệu orphan/stale
         floodGeoCache.clearGeoIndex();
 
@@ -83,19 +70,14 @@ public class CacheWarmer implements ApplicationRunner {
             return;
         }
 
-        int successCount = 0;
         for (CoreActiveFlood flood : activeFloods) {
             try {
                 floodGeoCache.cacheActiveFlood(toEvent(flood));
-                successCount++;
             } catch (Exception e) {
                 log.warn("[CacheWarmer][Flood] Bỏ qua eventId={} do lỗi: {}",
                         flood.getEventId(), e.getMessage());
             }
         }
-
-        log.info("[CacheWarmer][Flood] Đã cache {}/{} điểm ngập trong {}ms",
-                successCount, activeFloods.size(), Duration.between(start, Instant.now()).toMillis());
     }
 
     private FloodLifecycleEvent toEvent(CoreActiveFlood flood) {

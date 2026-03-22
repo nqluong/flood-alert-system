@@ -10,9 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.auth.config.JwtProperties;
 import org.project.floodalert.auth.model.User;
-import org.springframework.security.oauth2.jwt.JwtClaimsSet;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -32,7 +29,7 @@ public class JwtTokenGenerator {
     /**
      * Generate Access Token
      */
-    public String generateAccessToken(User user, List<String> roles) {
+    public String generateAccessToken(User user, List<String> roles, String fullName) {
         try {
             Instant now = Instant.now();
             Instant expiration = now.plusSeconds(jwtProperties.getAccessTokenExpiration());
@@ -44,7 +41,7 @@ public class JwtTokenGenerator {
                     .jwtID(UUID.randomUUID().toString())
                     .subject(user.getId().toString())
                     .claim("email", user.getEmail())
-                    .claim("fullName", user.getFullName())
+                    .claim("fullName", fullName)
                     .claim("roles", roles)
                     .claim("type", "access_token")
                     .build();

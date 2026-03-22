@@ -19,12 +19,15 @@ import org.project.floodalert.auth.enums.UserStatus;
 import org.project.floodalert.auth.exception.AuthErrorCode;
 import org.project.floodalert.auth.model.InvalidatedToken;
 import org.project.floodalert.auth.model.User;
+import org.project.floodalert.auth.model.UserProfile;
 import org.project.floodalert.auth.repository.InvalidatedTokenRepository;
+import org.project.floodalert.auth.repository.UserProfileRepository;
 import org.project.floodalert.auth.repository.UserRepository;
 import org.project.floodalert.auth.repository.UserRoleRepository;
 import org.project.floodalert.auth.security.JwtTokenGenerator;
 import org.project.floodalert.auth.security.JwtTokenValidator;
 import org.project.floodalert.auth.service.AuthService;
+import org.project.floodalert.auth.service.ReputationCacheService;
 import org.project.floodalert.auth.service.RoleService;
 import org.project.floodalert.auth.utils.AuditLogger;
 import org.project.floodalert.common.exception.AppException;
@@ -35,6 +38,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.project.floodalert.common.exception.ErrorCode.*;
@@ -54,6 +58,8 @@ public class AuthServiceImpl implements AuthService {
     AuditLogger auditLogger;
     RoleService roleService;
     InvalidatedTokenRepository invalidatedTokenRepository;
+    UserProfileRepository userProfileRepository;
+    ReputationCacheService reputationCacheService;
 
     @Override
     public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
@@ -70,6 +76,10 @@ public class AuthServiceImpl implements AuthService {
                         .orElseThrow(() -> new AppException(INVALID_CREDENTIALS));
             }
 
+            if (user == null) {
+                throw new AppException(INVALID_CREDENTIALS);
+            }
+
             // Validate user
             validateUserStatus(user);
             validateAuthProvider(user);
@@ -77,11 +87,17 @@ public class AuthServiceImpl implements AuthService {
 
             // Generate tokens
             List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
-            String accessToken = jwtTokenGenerator.generateAccessToken(user, roles);
+            UserProfile profile = getUserProfile(user.getId()).orElse(null);
+            String accessToken = jwtTokenGenerator.generateAccessToken(user, roles, getFullName(profile));
             String refreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
 
             // Update last login
             updateLastLogin(user);
+
+            // Cache reputation score bất đồng bộ - không chặn luồng login
+            if (profile != null) {
+                reputationCacheService.cacheAsync(user.getId(), profile.getReputationScore());
+            }
 
             // Log successful login
             auditLogger.logLogin(user.getId(), user.getEmail(), ipAddress, userAgent, loginMethod);
@@ -120,13 +136,14 @@ public class AuthServiceImpl implements AuthService {
         User newUser = User.builder()
                 .email(request.getEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
+//                .fullName(request.getFullName())
                 .phone(request.getPhoneNumber())
                 .status(UserStatus.ACTIVE)
                 .authProvider(AuthProvider.LOCAL)
                 .build();
 
         User savedUser = userRepository.save(newUser);
+        createUserProfile(savedUser.getId(), request.getFullName());
 
         assignDefaultRole(savedUser.getId());
 
@@ -160,7 +177,8 @@ public class AuthServiceImpl implements AuthService {
 
             // Generate new tokens
             List<String> roles = userRoleRepository.findRoleNamesByUserId(user.getId());
-            String newAccessToken = jwtTokenGenerator.generateAccessToken(user, roles);
+            UserProfile profile = getUserProfile(user.getId()).orElse(null);
+            String newAccessToken = jwtTokenGenerator.generateAccessToken(user, roles, getFullName(profile));
             String newRefreshToken = jwtTokenGenerator.generateRefreshToken(user.getId());
 
             auditLogger.logTokenRefresh(userId, user.getEmail(), null, null, true);
@@ -270,15 +288,41 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private UserResponse buildUserResponse(User user, List<String> roles) {
+        UserProfile profile = getUserProfile(user.getId()).orElse(null);
+
         return UserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .fullName(user.getFullName())
+                .fullName(getFullName(profile))
                 .phoneNumber(user.getPhone())
-                .avatarUrl(user.getAvatarUrl())
+                .avatarUrl(profile != null ? profile.getAvatarUrl() : null)
                 .status(user.getStatus().name())
                 .roles(roles)
                 .build();
+    }
+
+    private Optional<UserProfile> getUserProfile(UUID userId) {
+        return userProfileRepository.findByUserId(userId);
+    }
+
+    private String getFullName(UserProfile profile) {
+        return profile != null ? profile.getFullName() : null;
+    }
+
+    private void createUserProfile(UUID userId, String fullName) {
+        if (userProfileRepository.existsByUserId(userId)) {
+            return;
+        }
+
+        UserProfile profile = UserProfile.builder()
+                .userId(userId)
+                .fullName(fullName)
+                .avatarUrl(null)
+                .reputationScore(50)
+                .totalReportsSubmitted(0)
+                .build();
+
+        userProfileRepository.save(profile);
     }
 
     private void invalidateToken(String token, UUID userId, String reason,

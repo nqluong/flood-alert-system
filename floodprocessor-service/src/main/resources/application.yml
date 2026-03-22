@@ -55,6 +55,10 @@ app:
         concurrency: ${KAFKA_CONSUMER_CONCURRENCY:3}
         max-poll-records: ${KAFKA_MAX_POLL_RECORDS:500}
         batch-listener: true
+    user-report:
+      consumer:
+              group-id: ${KAFKA_USER_REPORT_CONSUMER_GROUP_ID:user-report-processor-group}
+              concurrency: ${KAFKA_USER_REPORT_CONCURRENCY:2}
 
   aggregator:
     kafka:
@@ -67,9 +71,13 @@ app:
     # Khoảng thời gian tối thiểu giữa 2 lần đồng bộ health (ms) - mặc định 5 phút
     sync-interval-ms: ${SENSOR_HEALTH_SYNC_INTERVAL_MS:300000}
 
-  # ── Consumer riêng cho luồng báo cáo người dùng ──────────────────────────
-  kafka:
-    user-report:
-      consumer:
-        group-id: ${KAFKA_USER_REPORT_CONSUMER_GROUP_ID:user-report-processor-group}
-        concurrency: ${KAFKA_USER_REPORT_CONCURRENCY:2}
+auth-service:
+  url: ${AUTH_SERVICE_URL:http://localhost:8081}
+
+
+gemini:
+  api-key: ${GEMINI_API_KEY}
+  base-url: https://generativelanguage.googleapis.com
+  model: gemini-1.5-flash
+  # Timeout tối đa cho mỗi lần gọi Gemini (giây). Giữ thấp để không nghẽn Kafka consumer.
+  timeout-seconds: 5

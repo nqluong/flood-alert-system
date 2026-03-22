@@ -17,6 +17,8 @@ public enum ProcessorErrorCode implements BaseErrorCode {
     SENSOR_ID_MISSING(1006, "Sensor ID bị thiếu trong dữ liệu", HttpStatus.BAD_REQUEST),
     WATER_LEVEL_INVALID(1007, "Mức nước không hợp lệ", HttpStatus.BAD_REQUEST),
     THRESHOLD_MISSING(1008, "Ngưỡng cảnh báo/nguy hiểm bị thiếu", HttpStatus.BAD_REQUEST),
+    FLOOD_EVENT_NOT_FOUND(1009, "Sự kiện ngập không tồn tại", HttpStatus.NOT_FOUND),
+    DATABASE_PERSISTENCE_FAILED(1010, "Lưu dữ liệu vào cơ sở dữ liệu thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
 
     INTERNAL_SERVER_ERROR(5000, "Lỗi hệ thống", HttpStatus.INTERNAL_SERVER_ERROR),
     VALIDATION_ERROR(4000, "Dữ liệu không hợp lệ", HttpStatus.BAD_REQUEST);

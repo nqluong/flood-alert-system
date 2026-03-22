@@ -18,12 +18,12 @@ public interface UserRoleMapper {
 
     @Mapping(target = "id", source = "userRole.id")
     @Mapping(target = "userEmail", source = "user.email")
-    @Mapping(target = "userFullName", source = "user.fullName")
+//    @Mapping(target = "userFullName", source = "user.fullName")
     @Mapping(target = "roleName", source = "role.name")
     UserRoleResponse toResponse(UserRole userRole, User user, Role role);
 
     @Mapping(target = "userEmail", ignore = true)
-    @Mapping(target = "userFullName", ignore = true)
+//    @Mapping(target = "userFullName", ignore = true)
     @Mapping(target = "roleName", ignore = true)
     UserRoleResponse toResponse(UserRole userRole);
 }

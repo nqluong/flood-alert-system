@@ -44,4 +44,22 @@ public class AsyncConfig {
 
         return executor;
     }
+
+    @Bean(name = "cacheExecutor")
+    public Executor cacheExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("cache-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+
+        log.info("Cache executor initialized with core pool size: {}, max pool size: {}",
+                executor.getCorePoolSize(), executor.getMaxPoolSize());
+
+        return executor;
+    }
 }

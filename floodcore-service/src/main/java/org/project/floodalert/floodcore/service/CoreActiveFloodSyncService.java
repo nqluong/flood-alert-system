@@ -19,7 +19,7 @@ import java.math.BigDecimal;
 public class CoreActiveFloodSyncService {
 
     private final CoreActiveFloodRepository coreActiveFloodRepository;
-    private final FloodGeoCache             floodGeoCache;
+    private final FloodGeoCache floodGeoCache;
 
     /**
      * Nhận sự kiện vòng đời ngập lụt từ Kafka topic flood-lifecycle-events.
@@ -73,7 +73,7 @@ public class CoreActiveFloodSyncService {
     }
 
     private void handleUpsert(FloodLifecycleEvent event) {
-        // 1. UPSERT vào PostgreSQL
+        // UPSERT vào PostgreSQL
         CoreActiveFlood flood = coreActiveFloodRepository
                 .findById(event.getEventId())
                 .orElseGet(() -> CoreActiveFlood.builder()
@@ -90,7 +90,7 @@ public class CoreActiveFloodSyncService {
         coreActiveFloodRepository.save(flood);
         log.debug("[FloodListener] Đã upsert DB eventId={}", event.getEventId());
 
-        // 2. Cập nhật Redis cache
+        // Cập nhật Redis cache
         floodGeoCache.cacheActiveFlood(event);
     }
 }
