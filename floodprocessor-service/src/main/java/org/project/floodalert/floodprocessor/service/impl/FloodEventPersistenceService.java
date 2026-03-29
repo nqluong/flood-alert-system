@@ -5,9 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.exception.AppException;
 import org.project.floodalert.floodprocessor.dto.request.ReportMessage;
+import org.project.floodalert.floodprocessor.enums.ContributorRole;
 import org.project.floodalert.floodprocessor.exception.ProcessorErrorCode;
+import org.project.floodalert.floodprocessor.model.EventContributor;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 import org.project.floodalert.floodprocessor.model.TrustScore;
+import org.project.floodalert.floodprocessor.repository.EventContributorRepository;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
 import org.project.floodalert.floodprocessor.repository.TrustScoreRepository;
 import org.springframework.stereotype.Service;
@@ -19,7 +22,9 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 
@@ -39,6 +44,7 @@ public class FloodEventPersistenceService {
 
     private final FloodEventRepository floodEventRepository;
     private final TrustScoreRepository trustScoreRepository;
+    private final EventContributorRepository eventContributorRepository;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -57,6 +63,9 @@ public class FloodEventPersistenceService {
             // Tạo TrustScore mới
             TrustScore trustScore = createNewTrustScore(savedEvent, msg, totalScore);
             TrustScore savedTrustScore = trustScoreRepository.save(trustScore);
+
+            // AUTO-INSERT EventContributor: PIONEER (người báo cáo đầu tiên)
+            createContributor(savedEvent.getId(), msg.getUserId(), ContributorRole.PIONEER);
 
             return savedEvent;
 
@@ -126,6 +135,10 @@ public class FloodEventPersistenceService {
             TrustScore savedTrustScore = trustScoreRepository.save(newTrustScore);
             log.info("[PERSISTENCE] [CREATED NEW TRUST_SCORE] id={}, floodEventId={}, finalScore={} (lịch sử tiến hóa)",
                     savedTrustScore.getId(), savedTrustScore.getFloodEventId(), savedTrustScore.getFinalScore());
+
+            // AUTO-INSERT EventContributor: VERIFIER (người xác nhận thêm)
+            // Chỉ insert nếu chưa tồn tại để tránh duplicate
+            createContributor(updatedEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER);
 
             return updatedEvent;
 
@@ -245,6 +258,9 @@ public class FloodEventPersistenceService {
             // Chỉ tăng vote_count (không thay đổi confidence_score)
             existingEvent.setVoteCount(existingEvent.getVoteCount() + 1);
 
+            // AUTO-INSERT EventContributor: VERIFIER (xác nhận cho event ACTIVE)
+            createContributor(existingEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER);
+
             // Cập nhật image nếu có
             if (msg.getImageUrl() != null && !msg.getImageUrl().isBlank()) {
                 Map<String, Object> rawData = existingEvent.getRawData();
@@ -257,7 +273,7 @@ public class FloodEventPersistenceService {
                 existingEvent.setRawData(rawData);
             }
 
-            // Lưu FloodEvent (trigger @PreUpdate → updatedAt)
+            // Lưu FloodEvent
             FloodEvent updated = floodEventRepository.save(existingEvent);
             log.info("[PERSISTENCE][FAST-UPDATE] Hoàn tất: eventId={}, vote_count={}",
                     updated.getEventId(), updated.getVoteCount());
@@ -274,6 +290,63 @@ public class FloodEventPersistenceService {
                     "Failed to fast-update flood event: " + e.getMessage(),
                     e
             );
+        }
+    }
+
+    /**
+     * Lấy tất cả contributors của một FloodEvent.
+     * Dùng cho Scenario 3 (PENDING -> ACTIVE) để reward tất cả contributors.
+     */
+    public List<EventContributor> getContributorsByEventId(UUID floodEventId) {
+        try {
+            List<EventContributor> contributors = eventContributorRepository
+                    .findByFloodEventIdOrderByCreatedAtDesc(floodEventId);
+
+
+            return contributors;
+
+        } catch (Exception e) {
+            log.error("[PERSISTENCE] Lỗi khi lấy contributors: floodEventId={}: {}",
+                    floodEventId, e.getMessage(), e);
+            throw new AppException(
+                    ProcessorErrorCode.DATABASE_PERSISTENCE_FAILED,
+                    "Failed to retrieve contributors: " + e.getMessage(),
+                    e
+            );
+        }
+    }
+
+    /**
+     * Tạo EventContributor mới với duplicate check.
+     * Nếu user đã contribute rồi, skip để tránh duplicate.
+     */
+    private void createContributor(UUID floodEventId, UUID userId, ContributorRole role) {
+        try {
+            // Check duplicate
+            Optional<EventContributor> existing = eventContributorRepository
+                    .findByFloodEventIdAndUserId(floodEventId, userId);
+
+            if (existing.isPresent()) {
+                log.debug("[PERSISTENCE] User đã contribute rồi: floodEventId={}, userId={}, skip",
+                        floodEventId, userId);
+                return;
+            }
+
+            // Tạo mới
+            EventContributor contributor = EventContributor.builder()
+                    .floodEventId(floodEventId)
+                    .userId(userId)
+                    .role(role.name()) // Convert enum to String
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            eventContributorRepository.save(contributor);
+        } catch (Exception e) {
+            // Không throw exception để không phá vỡ flow chính
+            // Chỉ log error và tiếp tục
+            log.error("[PERSISTENCE] Lỗi khi tạo contributor (non-critical): " +
+                    "floodEventId={}, userId={}, role={}: {}",
+                    floodEventId, userId, role, e.getMessage(), e);
         }
     }
 

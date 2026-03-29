@@ -48,6 +48,7 @@ app:
       ingest: ${KAFKA_INGEST_TOPIC:iot-raw}
       output: ${KAFKA_OUTPUT_TOPIC:flood-sensor-data-processed}
       lifecycle: ${KAFKA_LIFECYCLE_TOPIC:flood-lifecycle-events}
+      reputation: ${KAFKA_REPUTATION_TOPIC:reputation-update-events}
       sensor-health-sync: ${KAFKA_SENSOR_HEALTH_SYNC_TOPIC:sensor-health-sync}
       user-report: ${KAFKA_USER_REPORT_TOPIC:user-report-events}
     consumer:

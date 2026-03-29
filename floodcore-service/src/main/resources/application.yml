@@ -49,3 +49,6 @@ app:
         concurrency: ${KAFKA_SENSOR_HEALTH_CONCURRENCY:3}
         max-poll-records: ${KAFKA_SENSOR_HEALTH_MAX_POLL_RECORDS:50}
 
+flood-processor:
+  url: ${FLOOD_PROCESSOR_URL:http://localhost:8084}
+

@@ -3,13 +3,18 @@ package org.project.floodalert.floodprocessor.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
+import org.project.floodalert.floodprocessor.dto.event.ReputationUpdateEvent;
 import org.project.floodalert.floodprocessor.dto.request.ReportMessage;
 import org.project.floodalert.floodprocessor.dto.request.UserReportEvent;
 import org.project.floodalert.floodprocessor.dto.response.ScoringResult;
+import org.project.floodalert.floodprocessor.enums.ContributorRole;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
+import org.project.floodalert.floodprocessor.enums.ReputationReason;
+import org.project.floodalert.floodprocessor.model.EventContributor;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 import org.project.floodalert.floodprocessor.service.ReportProcessingUseCase;
 import org.project.floodalert.floodprocessor.service.SharedRedisGeoService;
+import org.project.floodalert.floodprocessor.service.gamification.ReputationEventPublisher;
 import org.project.floodalert.floodprocessor.service.scoring.ReportScoringEngine;
 import org.project.floodalert.floodprocessor.utils.GeoHashUtil;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +22,9 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -32,11 +39,18 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_REJECTED = "REJECTED";
 
+    // Gamification point values
+    private static final int POINTS_AUTO_REJECTED = -2;
+    private static final int POINTS_PIONEER_APPROVED = 5;
+    private static final int POINTS_VERIFIER_APPROVED = 2;
+    private static final int POINTS_ACTIVE_CONFIRMATION = 2;
+
     private final SharedRedisGeoService redisGeoService;
     private final ReportScoringEngine scoringEngine;
     private final FloodEventPersistenceService persistenceService;
     private final StringRedisTemplate stringRedisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
+    private final ReputationEventPublisher reputationEventPublisher;
 
     @Value("${app.kafka.topic.lifecycle}")
     private String lifecycleTopic;
@@ -46,19 +60,19 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
      *
      * <p>Luồng xử lý:</p>
      * <ol>
-     *   <li><b>[Chốt 1 - Anti-Spam]:</b> Kiểm tra cooldown per user per geohash</li>
-     *   <li><b>[Chốt 2 - Routing]:</b> Tìm event lân cận và route theo status:
+     *   <li><b>[Anti-Spam]:</b> Kiểm tra cooldown per user per geohash</li>
+     *   <li><b>[Routing]:</b> Tìm event lân cận và route theo status:
      *     <ul>
-     *       <li>Không có lân cận → Full scoring + Create new event</li>
-     *       <li>Có lân cận + ACTIVE → Fast update (no scoring)</li>
-     *       <li>Có lân cận + PENDING → Full scoring + Update</li>
+     *       <li>Không có lân cận -> Full scoring + Create new event</li>
+     *       <li>Có lân cận + ACTIVE -> Fast update (no scoring)</li>
+     *       <li>Có lân cận + PENDING -> Full scoring + Update</li>
      *     </ul>
      *   </li>
      * </ol>
      */
     @Override
     public void process(UserReportEvent event) {
-        log.info("[REPORT-PROCESSOR] ═══ Nhận báo cáo: reportId={}, userId={}, lat={}, lon={} ═══",
+        log.info("[REPORT-PROCESSOR] Nhận báo cáo: reportId={}, userId={}, lat={}, lon={} ═══",
                 event.getReportId(), event.getUserId(), event.getLat(), event.getLon());
 
         ReportMessage msg = toReportMessage(event);
@@ -114,7 +128,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
      * <ol>
      *   <li>Gọi ScoringEngine -> lấy ScoringResult (totalScore, aiScore, etc.)</li>
      *   <li>Gọi PersistenceService.handleNewReport -> tạo FloodEvent + TrustScore</li>
-     *   <li>Nếu status != REJECTED -> Bắn Kafka CREATED event</li>
+     *   <li>Xử lý gamification theo status (REJECTED/PENDING/ACTIVE)</li>
      * </ol>
      */
     private void handleNewReportScoring(ReportMessage msg) {
@@ -124,14 +138,32 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
         FloodEvent newEvent = persistenceService.handleNewReport(msg, totalScore);
 
-        //  Bắn Kafka event (nếu không bị REJECTED)
-        if (!STATUS_REJECTED.equals(newEvent.getStatus())) {
+        // GAMIFICATION: Scenario 1 & 2
+        if (STATUS_REJECTED.equals(newEvent.getStatus())) {
+            // AUTO_REJECTED -> Penalty -2 điểm
+            log.info("[GAMIFICATION][SCENARIO-1] AUTO_REJECTED: reportId={}, userId={}, score={} → Penalty {}",
+                    msg.getReportId(), msg.getUserId(), totalScore, POINTS_AUTO_REJECTED);
+
+            publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
+                    ReputationReason.AUTO_REJECTED, POINTS_AUTO_REJECTED, msg.getReportId());
+
+        } else if (STATUS_PENDING.equals(newEvent.getStatus())) {
+            // PENDING -> Hold reward (Delayed Reward Mechanism)
+            log.info("[GAMIFICATION][SCENARIO-2] PENDING: reportId={}, userId={}, score={} → Hold reward, chờ approval",
+                    msg.getReportId(), msg.getUserId(), totalScore);
+
+        } else if (STATUS_ACTIVE.equals(newEvent.getStatus())) {
+            // Event mới ngay lập tức ACTIVE (score >= 0.8) -> Reward PIONEER ngay
             publishLifecycleEvent(newEvent, LifecycleEventType.CREATED);
-            log.info("[REPORT-PROCESSOR][NEW-REPORT] Hoàn tất: eventId={}, status={}, totalScore={}",
+
+            log.info("[GAMIFICATION] ACTIVE ngay: reportId={}, userId={} → Reward {} (PIONEER)",
+                    msg.getReportId(), msg.getUserId(), POINTS_PIONEER_APPROVED);
+
+            publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
+                    ReputationReason.CLUSTER_APPROVED, POINTS_PIONEER_APPROVED, msg.getReportId());
+
+            log.info("[REPORT-PROCESSOR][NEW-REPORT] Hoàn tất: eventId={}, status={}, score={}",
                     newEvent.getEventId(), newEvent.getStatus(), totalScore);
-        } else {
-            log.info("[REPORT-PROCESSOR][NEW-REPORT] Báo cáo bị REJECTED: totalScore={} — Không bắn Kafka",
-                    totalScore);
         }
     }
 
@@ -142,6 +174,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
      * <ol>
      *   <li>KHÔNG gọi ScoringEngine (tiết kiệm AI API, time)</li>
      *   <li>Gọi PersistenceService.handleFastUpdate → chỉ tăng vote_count</li>
+     *   <li>Gamification: Reward +2 điểm (ACTIVE_CONFIRMATION)</li>
      *   <li>Bắn Kafka UPDATED event</li>
      * </ol>
      */
@@ -152,6 +185,13 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
         // Cập nhật nhanh (không chấm điểm)
         FloodEvent updatedEvent = persistenceService.handleFastUpdate(msg, existingEventId);
 
+        // GAMIFICATION: Scenario 4 - ACTIVE Confirmation (Té nước theo mưa)
+        log.info("[GAMIFICATION][SCENARIO-4] ACTIVE confirmation: userId={}, eventId={} → Reward {}",
+                msg.getUserId(), existingEventId, POINTS_ACTIVE_CONFIRMATION);
+
+        publishReputationEvent(msg.getUserId(), updatedEvent.getEventId(),
+                ReputationReason.ACTIVE_CONFIRMATION, POINTS_ACTIVE_CONFIRMATION, msg.getReportId());
+
         // Bắn Kafka UPDATED event
         publishLifecycleEvent(updatedEvent, LifecycleEventType.UPDATED);
 
@@ -160,35 +200,71 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
     }
 
     /**
-     * <b>KỊCH BẢN C:</b> Event lân cận có status = PENDING → Full scoring để kiểm tra PENDING→ACTIVE.
+     * <b>KỊCH BẢN C:</b> Event lân cận có status = PENDING -> Full scoring để kiểm tra PENDING->ACTIVE.
      *
      * <p>Luồng:</p>
      * <ol>
-     *   <li>Gọi ScoringEngine → lấy điểm mới (vì vote_count tăng)</li>
-     *   <li>Gọi PersistenceService.handleClusterUpdate → cập nhật điểm + check transition</li>
+     *   <li>Gọi ScoringEngine -> lấy điểm mới (vì vote_count tăng)</li>
+     *   <li>Gọi PersistenceService.handleClusterUpdate -> cập nhật điểm + check transition</li>
+     *   <li>Nếu PENDING→ACTIVE: Reward TẤT CẢ contributors</li>
      *   <li>Bắn Kafka UPDATED event</li>
      * </ol>
      */
     private void handlePendingClusterUpdate(ReportMessage msg, String existingEventId) {
-        log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Event PENDING, cần re-score: reportId={} → eventId={}",
+        log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Event PENDING, re-score: reportId={} → eventId={}",
                 msg.getReportId(), existingEventId);
+
+        // Lưu OLD status (trước khi update)
+        String oldStatus = persistenceService.getEventStatus(existingEventId);
 
         // Chấm điểm lại
         ScoringResult scoringResult = scoringEngine.evaluateScore(msg);
         double newScore = scoringResult.getTotalScore();
 
-        log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Kết quả scoring: eventId={}, newScore={}, " +
+        log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Scoring result: eventId={}, newScore={}, " +
                         "ai={}, spatial={}, reputation={}",
                 existingEventId, newScore, scoringResult.getAiScore(),
                 scoringResult.getSpatialScore(), scoringResult.getReputationScore());
 
-        // Cập nhật Database (có thể PENDING→ACTIVE)
+        // Cập nhật Database (có thể PENDING->ACTIVE)
         FloodEvent updatedEvent = persistenceService.handleClusterUpdate(msg, existingEventId, newScore);
+
+        // GAMIFICATION: Scenario 3 - PENDING -> ACTIVE Transition (Giọt nước tràn ly)
+        if (STATUS_PENDING.equals(oldStatus) && STATUS_ACTIVE.equals(updatedEvent.getStatus())) {
+            log.info("[GAMIFICATION][SCENARIO-3] Status transition: PENDING → ACTIVE for eventId={}",
+                    existingEventId);
+
+            // Lấy TẤT CẢ contributors từ DB (PIONEER + all VERIFIERs)
+            List<EventContributor> contributors = persistenceService.getContributorsByEventId(updatedEvent.getId());
+            log.info("[GAMIFICATION][SCENARIO-3] Found {} contributors to reward", contributors.size());
+
+            // Reward từng contributor theo role
+            for (EventContributor contributor : contributors) {
+                String role = contributor.getRole();
+                int points;
+
+                if (ContributorRole.PIONEER.name().equals(role)) {
+                    points = POINTS_PIONEER_APPROVED;  // +5 điểm
+                } else if (ContributorRole.VERIFIER.name().equals(role)) {
+                    points = POINTS_VERIFIER_APPROVED; // +2 điểm
+                } else {
+                    log.warn("[GAMIFICATION][SCENARIO-3] Unknown role: {} for contributor {}",
+                            role, contributor.getId());
+                    continue;
+                }
+
+                log.info("[GAMIFICATION][SCENARIO-3] Reward: userId={}, role={}, points={}",
+                        contributor.getUserId(), role, points);
+
+                publishReputationEvent(contributor.getUserId(), updatedEvent.getEventId(),
+                        ReputationReason.CLUSTER_APPROVED, points, msg.getReportId());
+            }
+        }
 
         // Bắn Kafka UPDATED event
         publishLifecycleEvent(updatedEvent, LifecycleEventType.UPDATED);
 
-        log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Hoàn tất: eventId={}, status={}, newScore={}",
+        log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Completed: eventId={}, status={}, newScore={}",
                 updatedEvent.getEventId(), updatedEvent.getStatus(), newScore);
     }
 
@@ -208,7 +284,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
     }
 
     /**
-     * Convert UserReportEvent → ReportMessage.
+     * Convert UserReportEvent -> ReportMessage.
      */
     private ReportMessage toReportMessage(UserReportEvent event) {
         return ReportMessage.builder()
@@ -220,5 +296,31 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                 .severityLevel(event.getSeverityLevel())
                 .description(event.getDescription())
                 .build();
+    }
+
+    /**
+     * Helper: Publish ReputationUpdateEvent ra Kafka.
+     * Non-critical operation - không throw exception để không phá main flow.
+     */
+    private void publishReputationEvent(UUID userId, String eventId,
+                                       ReputationReason reason, int points, String reportId) {
+        try {
+            ReputationUpdateEvent event = ReputationUpdateEvent.builder()
+                    .userId(userId)
+                    .eventId(eventId)
+                    .reason(reason)
+                    .points(points)
+                    .reportId(reportId)
+                    .build();
+
+            reputationEventPublisher.publish(event);
+
+            log.debug("[REPUTATION] Published: userId={}, reason={}, points={}", userId, reason, points);
+
+        } catch (Exception e) {
+            // Log-only, don't throw (gamification là phụ, không nên fail main flow)
+            log.error("[REPUTATION] Publish failed (non-critical): userId={}, reason={}: {}",
+                      userId, reason, e.getMessage(), e);
+        }
     }
 }
