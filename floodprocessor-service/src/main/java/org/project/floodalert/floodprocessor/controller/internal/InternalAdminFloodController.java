@@ -13,14 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 
-/**
- * Internal API cho Admin manual approval/rejection flood events.
- * Endpoint này được gọi từ FloodCore service qua FeignClient.
- * <p>
- * KHÔNG có @PreAuthorize vì:
- * - Đây là internal API, chỉ được gọi từ FloodCore (đã verify auth ở FloodCore)
- * - FloodProcessor không có trực tiếp JWT context
- */
+
 @Slf4j
 @RestController
 @RequestMapping("/internal/api/v1/admin/floods")

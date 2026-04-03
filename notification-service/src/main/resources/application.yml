@@ -5,11 +5,51 @@ spring:
   application:
     name: notification-service
 
+  threads:
+    virtual:
+      enabled: true
+
+  datasource:
+    url: "jdbc:${DB_URL_NOTIFICATION}"
+    username: ${DB_USERNAME_NOTIFICATION}
+    password: ${DB_PASSWORD_NOTIFICATION}
+    driver-class-name: "org.postgresql.Driver"
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: ${REDIS_DATABASE:0}
+      timeout: 3000
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 10
+          min-idle: 5
+          max-wait: 3000ms
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 50
+        format_sql: true
+
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
       enable-auto-commit: false
       auto-offset-reset: latest
+
+  task:
+    scheduling:
+      pool:
+        size: 3
+      thread-name-prefix: "vt-scheduler-"
 
 app:
   kafka:
@@ -21,3 +61,18 @@ app:
         group-id: admin-socket-telemetry-group
       alert:
         group-id: admin-socket-alert-group
+
+  firebase:
+    enabled: true
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
+
+  notification:
+    dispatch:
+      fixed-delay: 2000  # Run every 2 seconds (in milliseconds)
+      batch-size: 500    # Process up to 500 notifications per batch
+
+    retry:
+      max-retries: 3             # Maximum retry attempts
+      retry-delay-minutes: 5     # Delay between retries (in minutes)
+      cron: "0 * * * * *"        # Run every minute
+
