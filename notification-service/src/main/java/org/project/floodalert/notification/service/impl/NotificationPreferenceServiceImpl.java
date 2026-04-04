@@ -29,7 +29,7 @@ public class NotificationPreferenceServiceImpl implements NotificationPreference
 
         return notificationPreferenceRepository.findById(userId)
                 .map(this::mapToResponse)
-                .orElseGet(() -> buildDefaultResponse());
+                .orElseGet(this::buildDefaultResponse);
     }
 
     @Override

@@ -114,7 +114,7 @@ public class RedisGeoServiceImpl implements RedisGeoService {
             List<Point> positions = geoOps.position(USER_LOCATIONS_KEY, userId.toString());
 
             if (positions != null && !positions.isEmpty()) {
-                return positions.get(0);
+                return positions.getFirst();
             }
             return null;
 
