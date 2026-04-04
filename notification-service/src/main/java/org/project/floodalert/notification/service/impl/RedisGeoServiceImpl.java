@@ -4,11 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.notification.dto.UserGeoDTO;
 import org.project.floodalert.notification.service.RedisGeoService;
-import org.springframework.data.geo.Circle;
-import org.springframework.data.geo.Distance;
-import org.springframework.data.geo.GeoResults;
-import org.springframework.data.geo.Point;
-import org.springframework.data.geo.Metrics;
+import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -25,7 +21,8 @@ public class RedisGeoServiceImpl implements RedisGeoService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
-    private static final String USER_LOCATIONS_KEY = "user:locations";
+    private static final String USER_LOCATIONS_KEY = "user:active_locations";
+    private static final String HEARTBEAT_PREFIX = "user:heartbeat:";
 
     /**
      * Tìm users gần điểm ngập lụt trong bán kính chỉ định
@@ -40,54 +37,64 @@ public class RedisGeoServiceImpl implements RedisGeoService {
     @Override
     public List<UserGeoDTO> findUsersNear(Double lat, Double lon, Double radiusKm) {
         try {
-            log.debug("Redis GEO Query: Finding users near ({}, {}) within {}km",
-                    lat, lon, radiusKm);
+            log.debug("Redis GEO Query: Finding users near ({}, {}) within {}km", lat, lon, radiusKm);
 
             GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
-
             Point center = new Point(lon, lat);
-
             Distance radius = new Distance(radiusKm, Metrics.KILOMETERS);
             Circle area = new Circle(center, radius);
 
+            // Quét không gian
             GeoResults<RedisGeoCommands.GeoLocation<Object>> results = geoOps.radius(
                     USER_LOCATIONS_KEY,
                     area,
                     RedisGeoCommands.GeoRadiusCommandArgs
                             .newGeoRadiusArgs()
                             .includeDistance()
-                            .sortAscending() // Sort by distance ascending
+                            .sortAscending()
             );
 
             if (results == null || results.getContent().isEmpty()) {
-                log.debug("No users found within {}km radius", radiusKm);
                 return new ArrayList<>();
             }
 
-            // Convert results to UserGeoDTO
-            List<UserGeoDTO> userGeoDTOs = new ArrayList<>();
-            results.forEach(result -> {
-                try {
-                    String userIdStr = result.getContent().getName().toString();
-                    Double distance = result.getDistance().getValue(); // in kilometers
+            List<GeoResult<RedisGeoCommands.GeoLocation<Object>>> rawList = results.getContent();
 
-                    // Convert distance from km to meters
-                    Double distanceMeters = distance * 1000;
+            List<String> heartbeatKeys = rawList.stream()
+                    .map(result -> HEARTBEAT_PREFIX + result.getContent().getName().toString())
+                    .toList();
 
-                    UUID userId = UUID.fromString(userIdStr);
+            List<Object> heartbeats = redisTemplate.opsForValue().multiGet(heartbeatKeys);
 
-                    userGeoDTOs.add(UserGeoDTO.builder()
-                            .userId(userId)
-                            .distance(distanceMeters)
-                            .build());
+            List<UserGeoDTO> validUsers = new ArrayList<>();
+            List<Object> ghostUsersToClean = new ArrayList<>();
 
-                } catch (IllegalArgumentException e) {
-                    log.warn("Invalid userId format in Redis: {}", result.getContent().getName());
+            for (int i = 0; i < rawList.size(); i++) {
+                GeoResult<RedisGeoCommands.GeoLocation<Object>> result = rawList.get(i);
+                String userIdStr = result.getContent().getName().toString();
+
+                if (heartbeats != null && heartbeats.get(i) != null) {
+                    try {
+                        UUID userId = UUID.fromString(userIdStr);
+                        Double distanceMeters = result.getDistance().getValue() * 1000;
+
+                        validUsers.add(UserGeoDTO.builder()
+                                .userId(userId)
+                                .distance(distanceMeters)
+                                .build());
+                    } catch (IllegalArgumentException e) {
+                        log.warn("Invalid userId format in Redis GEO: {}", userIdStr);
+                    }
+                } else {
+                    ghostUsersToClean.add(userIdStr);
                 }
-            });
+            }
 
-            log.info("Found {} users within {}km radius", userGeoDTOs.size(), radiusKm);
-            return userGeoDTOs;
+            if (!ghostUsersToClean.isEmpty()) {
+                geoOps.remove(USER_LOCATIONS_KEY, ghostUsersToClean.toArray());
+            }
+
+            return validUsers;
 
         } catch (Exception e) {
             log.error("Error querying Redis GEO for location ({}, {})", lat, lon, e);
@@ -95,62 +102,20 @@ public class RedisGeoServiceImpl implements RedisGeoService {
         }
     }
 
-    /**
-     * Optional: Add user location to Redis
-     * <p>
-     * Có thể gọi method này khi user cập nhật location
-     * (Hoặc có thể implement trong user-service)
-     *
-     * @param userId User ID
-     * @param lat    Latitude
-     * @param lon    Longitude
-     */
-    public void addUserLocation(UUID userId, Double lat, Double lon) {
-        try {
-            GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
-
-            Point location = new Point(lon, lat);
-            geoOps.add(USER_LOCATIONS_KEY, location, userId.toString());
-
-            log.debug("Added user {} location to Redis: ({}, {})", userId, lat, lon);
-
-        } catch (Exception e) {
-            log.error("Error adding user location to Redis", e);
-        }
-    }
-
-    /**
-     * Optional: Remove user location from Redis
-     *
-     * @param userId User ID
-     */
-    public void removeUserLocation(UUID userId) {
-        try {
-            GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
-            geoOps.remove(USER_LOCATIONS_KEY, userId.toString());
-
-            log.debug("Removed user {} location from Redis", userId);
-
-        } catch (Exception e) {
-            log.error("Error removing user location from Redis", e);
-        }
-    }
-
-    /**
-     * Optional: Get user location from Redis
-     *
-     * @param userId User ID
-     * @return Point (lon, lat) or null if not found
-     */
     public Point getUserLocation(UUID userId) {
         try {
+            // Check heartbeat
+            Object heartbeat = redisTemplate.opsForValue().get(HEARTBEAT_PREFIX + userId.toString());
+            if (heartbeat == null) {
+                return null;
+            }
+
             GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
             List<Point> positions = geoOps.position(USER_LOCATIONS_KEY, userId.toString());
 
             if (positions != null && !positions.isEmpty()) {
                 return positions.get(0);
             }
-
             return null;
 
         } catch (Exception e) {
@@ -159,11 +124,6 @@ public class RedisGeoServiceImpl implements RedisGeoService {
         }
     }
 
-    /**
-     * Optional: Count total users in Redis GEO
-     *
-     * @return Total user count
-     */
     public Long getTotalUserCount() {
         try {
             return redisTemplate.opsForZSet().size(USER_LOCATIONS_KEY);

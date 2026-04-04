@@ -110,9 +110,27 @@ public class GlobalExceptionHandler {
                 .body(errorResponse);
     }
 
-    /**
-     * Handle all other exceptions
-     */
+
+    @ExceptionHandler(RedisOperationException.class)
+    public ResponseEntity<ErrorResponse> handleRedisOperationException(
+            RedisOperationException ex, HttpServletRequest request) {
+
+        log.error("Redis operation failed: {}", ex.getMessage(), ex);
+
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .success(false)
+                .code(5001) // REDIS_ERROR code
+                .message("Lỗi hệ thống cache")
+                .details("Không thể cập nhật vị trí. Vui lòng thử lại sau.")
+                .path(request.getRequestURI())
+                .build();
+
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(errorResponse);
+    }
+
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(
             Exception ex, HttpServletRequest request) {

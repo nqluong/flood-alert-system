@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: auth-service
+  threads:
+    virtual:
+      enabled: true  # Enable Virtual Threads (Java 21+) for I/O optimization
   datasource:
     url: "jdbc:${DB_URL_AUTH}"
     username: ${DB_USERNAME_AUTH}
