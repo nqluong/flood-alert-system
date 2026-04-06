@@ -25,21 +25,21 @@ public class UserReportController {
 
     private final UserReportService userReportService;
 
-//    /**
-//     * Người dùng gửi báo cáo ngập lụt.
-//     * POST /api/v1/reports
-//     */
-//    @PostMapping
-//    @PreAuthorize("isAuthenticated()")
-//    public ResponseEntity<ApiResponse<UserReportResponse>> submitReport(
-//            @Valid @RequestBody UserReportRequest request) {
-//
-//        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
-//        log.info("POST /api/v1/reports - userId={}", userId);
-//
-//        UserReportResponse response = userReportService.submitUserReport(request, userId);
-//        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
-//    }
+    /**
+     * Người dùng gửi báo cáo ngập lụt.
+     * POST /api/v1/reports
+     */
+    @PostMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<UserReportResponse>> submitReport(
+            @Valid @RequestBody UserReportRequest request) {
+
+        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
+        log.info("POST /api/v1/reports - userId={}", userId);
+
+        UserReportResponse response = userReportService.submitUserReport(request, userId);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(response));
+    }
 
     /**
      * Người dùng xem danh sách báo cáo của chính mình, có filter và phân trang.
