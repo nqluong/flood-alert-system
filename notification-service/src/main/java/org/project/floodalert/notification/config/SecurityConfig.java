@@ -8,6 +8,7 @@ import org.project.floodalert.common.security.CustomAuthenticationEntryPoint;
 import org.project.floodalert.common.security.InternalAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true , securedEnabled = true)
 @RequiredArgsConstructor
+@Order(100)
 public class SecurityConfig {
 
     private final InternalAuthFilter internalAuthFilter;
@@ -38,8 +40,10 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers("/ws-admin/**").permitAll()
+                        
+                        .requestMatchers("/ws", "/ws/**").permitAll()
+                        .requestMatchers("/ws-admin", "/ws-admin/**").permitAll()
+                        
                         .anyRequest().authenticated()
                 )
 

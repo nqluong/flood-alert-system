@@ -31,7 +31,7 @@ spring:
             - Path=/flood-alert/api/v1/auth/**,
               /flood-alert/api/v1/roles/**,
               /flood-alert/api/v1/user-roles/**,
-              /flood-alert/api/v1/user/**
+              /flood-alert/api/v1/users/**
           filters:
             - StripPrefix=1
 
@@ -68,7 +68,10 @@ spring:
             - Path=/flood-alert/ws-admin/**
           filters:
             - StripPrefix=1
-            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary, RETAIN_FIRST
+            - name: DedupeResponseHeader
+              args:
+                name: Access-Control-Allow-Origin Access-Control-Allow-Credentials
+                strategy: RETAIN_FIRST
 
         - id: notification-service-websocket-native
           uri: http://localhost:8085
@@ -76,7 +79,10 @@ spring:
             - Path=/flood-alert/ws
           filters:
             - StripPrefix=1
-            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary, RETAIN_FIRST
+            - name: DedupeResponseHeader
+              args:
+                name: Access-Control-Allow-Origin Access-Control-Allow-Credentials
+                strategy: RETAIN_FIRST
 
 app:
   services:

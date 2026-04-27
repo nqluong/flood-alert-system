@@ -10,12 +10,6 @@ public class UserReportSpecification {
 
     private UserReportSpecification() {}
 
-    /**
-     * Xây dựng Specification tổng hợp từ userId và bộ filter.
-     *
-     * @param userId null → lấy tất cả người dùng; non-null → chỉ lấy của người dùng đó
-     * @param filter chứa status, severityLevel
-     */
     public static Specification<UserReport> build(UUID userId, UserReportFilterRequest filter) {
         return Specification
                 .where(hasUserId(userId))

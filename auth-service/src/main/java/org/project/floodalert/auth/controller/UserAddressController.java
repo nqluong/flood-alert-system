@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/user/addresses")
+@RequestMapping("/api/v1/users/addresses")
 @RequiredArgsConstructor
 public class UserAddressController {
     private final UserAddressService userAddressService;

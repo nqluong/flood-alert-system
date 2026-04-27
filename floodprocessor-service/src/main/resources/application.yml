@@ -82,3 +82,9 @@ gemini:
   model: gemini-1.5-flash
   # Timeout tối đa cho mỗi lần gọi Gemini (giây). Giữ thấp để không nghẽn Kafka consumer.
   timeout-seconds: 5
+  # Retry configuration
+  retry:
+    max-attempts: 3  # Số lần retry tối đa (không tính lần gọi đầu tiên)
+    initial-delay-ms: 1000  # Delay ban đầu: 1 giây
+    max-delay-ms: 5000  # Delay tối đa: 5 giây
+    multiplier: 2.0  # Exponential backoff multiplier

@@ -38,8 +38,12 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final List<String> PUBLIC_PATHS = List.of(
             "/flood-alert/api/v1/auth/login",
+            "/flood-alert/api/v1/auth/social",
             "/flood-alert/api/v1/auth/register",
-            "/flood-alert/api/v1/auth/refresh",
+            "/flood-alert/api/v1/auth/refresh"
+    );
+
+    private static final List<String> WEBSOCKET_PATHS = List.of(
             "/flood-alert/ws-admin",
             "/flood-alert/ws"
     );
@@ -47,14 +51,25 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
+        HttpMethod method = exchange.getRequest().getMethod();
+
+        log.debug("Request: {} {}", method, path);
 
         // Bỏ qua xác thực cho preflight OPTIONS request (CORS)
         if (exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
+            log.debug("Bypassing OPTIONS request for path: {}", path);
+            return chain.filter(exchange);
+        }
+
+        // Bỏ qua xác thực cho WebSocket endpoints
+        if (isWebSocketPath(path)) {
+            log.info("Bypassing authentication for WebSocket path: {}", path);
             return chain.filter(exchange);
         }
 
         // Bỏ qua xác thực cho public endpoints
         if (isPublicPath(path)) {
+            log.info("Bypassing authentication for public path: {}", path);
             return chain.filter(exchange);
         }
 
@@ -142,9 +157,10 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     }
 
     private boolean isPublicPath(String path) {
-
-        log.info("Checking if path is public: {}", path);
         return PUBLIC_PATHS.stream().anyMatch(path::startsWith);
     }
 
+    private boolean isWebSocketPath(String path) {
+        return WEBSOCKET_PATHS.stream().anyMatch(path::startsWith);
+    }
 }

@@ -19,7 +19,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // Endpoint có SockJS fallback — dùng cho browser/frontend
+
         registry.addEndpoint("/ws-admin")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();

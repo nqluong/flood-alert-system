@@ -56,11 +56,14 @@ app:
     topic:
       processed-events: flood-sensor-data-processed
       lifecycle-events: flood-lifecycle-events
+      fcm-token: ${KAFKA_FCM_TOKEN_TOPIC:fcm-token-events}
     consumer:
       telemetry:
         group-id: admin-socket-telemetry-group
       alert:
         group-id: admin-socket-alert-group
+      fcm-token:
+        group-id: ${KAFKA_FCM_TOKEN_GROUP_ID:notification-fcm-token-group}
 
   firebase:
     enabled: true

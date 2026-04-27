@@ -34,39 +34,52 @@ public class KafkaConsumerConfig {
         return props;
     }
 
+    private ConsumerFactory<String, Object> createConsumerFactory(String valueDefaultType) {
+        Map<String, Object> props = baseProps();
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, valueDefaultType);
+        return new DefaultKafkaConsumerFactory<>(props);
+    }
+
+    private ConcurrentKafkaListenerContainerFactory<String, Object> createContainerFactory(
+            ConsumerFactory<String, Object> consumerFactory, 
+            int concurrency) {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory);
+        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
+        factory.setConcurrency(concurrency);
+        return factory;
+    }
+
+
     @Bean
     public ConsumerFactory<String, Object> telemetryConsumerFactory() {
-        Map<String, Object> props = baseProps();
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
-                "org.project.floodalert.notification.dto.response.ProcessedSensorData");
-        return new DefaultKafkaConsumerFactory<>(props);
+        return createConsumerFactory("org.project.floodalert.notification.dto.response.ProcessedSensorData");
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> notificationKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(telemetryConsumerFactory());
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
-        factory.setConcurrency(1);
-        return factory;
+        return createContainerFactory(telemetryConsumerFactory(), 1);
     }
+
 
     @Bean
     public ConsumerFactory<String, Object> lifecycleConsumerFactory() {
-        Map<String, Object> props = baseProps();
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
-                "org.project.floodalert.notification.dto.event.FloodLifecycleEvent");
-        return new DefaultKafkaConsumerFactory<>(props);
+        return createConsumerFactory("org.project.floodalert.notification.dto.event.FloodLifecycleEvent");
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> lifecycleKafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(lifecycleConsumerFactory());
-        factory.getContainerProperties().setAckMode(ContainerProperties.AckMode.MANUAL_IMMEDIATE);
-        factory.setConcurrency(1);
-        return factory;
+        return createContainerFactory(lifecycleConsumerFactory(), 1);
+    }
+
+    @Bean
+    public ConsumerFactory<String, Object> fcmTokenConsumerFactory() {
+        return createConsumerFactory("org.project.floodalert.notification.dto.event.FcmTokenEvent");
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> fcmTokenKafkaListenerContainerFactory() {
+        return createContainerFactory(fcmTokenConsumerFactory(), 2);
     }
 }

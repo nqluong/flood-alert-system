@@ -45,11 +45,11 @@ public class MapApiController {
         return ResponseEntity.ok(ApiResponse.success(floods));
     }
 
-    @PostMapping("/user-report")
-    public ResponseEntity<ApiResponse<UserReportResponse>> getUserReport(@RequestBody UserReportRequest userReportRequest) {
-        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
-        UserReportResponse userReportResponse = userReportService.submitUserReport(userReportRequest, userId);
-        return ResponseEntity.ok(ApiResponse.success(userReportResponse));
-    }
+//    @PostMapping("/user-report")
+//    public ResponseEntity<ApiResponse<UserReportResponse>> getUserReport(@RequestBody UserReportRequest userReportRequest) {
+//        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
+//        UserReportResponse userReportResponse = userReportService.submitUserReport(userReportRequest, userId);
+//        return ResponseEntity.ok(ApiResponse.success(userReportResponse));
+//    }
 }
 

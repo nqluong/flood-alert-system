@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.dto.response.PageResponse;
 import org.project.floodalert.common.exception.AppException;
+import org.project.floodalert.floodcore.dto.request.BatchCreateSensorRequest;
 import org.project.floodalert.floodcore.dto.request.CreateSensorRequest;
 import org.project.floodalert.floodcore.dto.request.SensorFilterRequest;
+import org.project.floodalert.floodcore.dto.response.BatchCreateSensorResponse;
 import org.project.floodalert.floodcore.dto.response.CreateSensorResponse;
 import org.project.floodalert.floodcore.dto.response.SensorDetailResponse;
 import org.project.floodalert.floodcore.dto.response.SensorMapResponse;
@@ -25,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -79,6 +82,58 @@ public class SensorServiceImpl implements SensorService {
             throw new AppException(CoreErrorCode.DATABASE_ERROR,
                     "Không thể tạo cảm biến do lỗi hệ thống");
         }
+    }
+
+    @Override
+    @Transactional
+    public BatchCreateSensorResponse batchCreateSensors(BatchCreateSensorRequest request, UUID performedBy) {
+        log.info("Bắt đầu tạo batch {} sensors", request.getSensors().size());
+        
+        List<BatchCreateSensorResponse.CreateSensorResult> results = new ArrayList<>();
+        int successCount = 0;
+        int failureCount = 0;
+
+        for (CreateSensorRequest sensorRequest : request.getSensors()) {
+            try {
+                // Tạo từng sensor
+                CreateSensorResponse sensorResponse = createSensor(sensorRequest, performedBy);
+                
+                // Thêm vào kết quả thành công
+                results.add(BatchCreateSensorResponse.CreateSensorResult.builder()
+                        .success(true)
+                        .sensorId(sensorRequest.getSensorId())
+                        .data(sensorResponse)
+                        .build());
+                
+                successCount++;
+                log.info("Tạo sensor {} thành công ({}/{})", 
+                        sensorRequest.getSensorId(), successCount + failureCount, request.getSensors().size());
+                
+            } catch (Exception e) {
+                // Thêm vào kết quả thất bại
+                results.add(BatchCreateSensorResponse.CreateSensorResult.builder()
+                        .success(false)
+                        .sensorId(sensorRequest.getSensorId())
+                        .errorMessage(e.getMessage())
+                        .build());
+                
+                failureCount++;
+                log.error("Tạo sensor {} thất bại: {}", sensorRequest.getSensorId(), e.getMessage());
+            }
+        }
+
+        String message = String.format("Hoàn thành tạo batch sensors: %d thành công, %d thất bại", 
+                successCount, failureCount);
+        
+        log.info(message);
+
+        return BatchCreateSensorResponse.builder()
+                .totalRequested(request.getSensors().size())
+                .successCount(successCount)
+                .failureCount(failureCount)
+                .results(results)
+                .message(message)
+                .build();
     }
 
     @Override

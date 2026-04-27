@@ -21,15 +21,7 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Event Listener & Lọc dữ liệu
- * <p>
- * Lắng nghe Kafka event từ topic 'flood.lifecycle.events',
- * thực hiện quét radar tìm users gần điểm ngập,
- * lọc qua filter preferences, và persist vào DB với status PENDING.
- * <p>
- * KHÔNG gọi Firebase tại class này.
- */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -42,9 +34,6 @@ public class NotificationEventConsumer {
     private static final double RADAR_RADIUS_KM = 5.0;
     private static final int MAX_RETRIES = 3;
 
-    /**
-     * Lắng nghe Kafka topic flood.lifecycle.events
-     */
     @KafkaListener(
             topics = "${app.kafka.topic.lifecycle-events}",
             groupId = "notification-push-group",

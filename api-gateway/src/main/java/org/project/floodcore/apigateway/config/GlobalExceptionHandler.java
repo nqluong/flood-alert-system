@@ -33,16 +33,23 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
         ServerHttpResponse response = exchange.getResponse();
         String path = exchange.getRequest().getPath().value();
 
+        // Nếu response đã committed (WebSocket handshake), không thể modify response
+        if (response.isCommitted()) {
+            log.warn("Response already committed for path [{}], cannot handle exception: {}", 
+                    path, ex.getMessage());
+            return Mono.empty();
+        }
+
         HttpStatus status;
         String message;
 
         if (isConnectionRefused(ex)) {
             status = HttpStatus.SERVICE_UNAVAILABLE;
-            message = "Dịch vụ hiện không khả dụng, vui lòng thử lại sau";
+            message = "Hệ thống hiện không khả dụng, vui lòng thử lại sau";
             log.error("Service unavailable – connection refused for path [{}]: {}", path, ex.getMessage());
         } else if (isConnectionTimeout(ex)) {
             status = HttpStatus.GATEWAY_TIMEOUT;
-            message = "Dịch vụ không phản hồi, yêu cầu đã hết thời gian chờ";
+            message = "Hệ thống không phản hồi, yêu cầu đã hết thời gian chờ";
             log.error("Gateway timeout for path [{}]: {}", path, ex.getMessage());
         } else if (ex instanceof ResponseStatusException rse) {
             status = HttpStatus.valueOf(rse.getStatusCode().value());

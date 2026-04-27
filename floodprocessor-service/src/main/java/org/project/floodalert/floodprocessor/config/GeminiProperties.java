@@ -17,4 +17,14 @@ public class GeminiProperties {
     private String model;
 
     private int timeoutSeconds = 5;
+
+    private RetryConfig retry = new RetryConfig();
+
+    @Data
+    public static class RetryConfig {
+        private int maxAttempts = 3;
+        private long initialDelayMs = 1000;
+        private long maxDelayMs = 5000;
+        private double multiplier = 2.0;
+    }
 }

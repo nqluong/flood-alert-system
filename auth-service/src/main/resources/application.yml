@@ -6,7 +6,7 @@ spring:
     name: auth-service
   threads:
     virtual:
-      enabled: true  # Enable Virtual Threads (Java 21+) for I/O optimization
+      enabled: true
   datasource:
     url: "jdbc:${DB_URL_AUTH}"
     username: ${DB_USERNAME_AUTH}
@@ -38,11 +38,12 @@ spring:
           max-idle: 8
           min-idle: 0
           max-wait: -1ms
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
   config:
     import: classpath:key-redis.yml
 
 jwt:
-#  secret-key: "${SECRET_KEY_JWT}"
   issuer: flood-alert-auth-service
   access-token-expiration: 3600 # 24 hours
   refresh-token-expiration: 604800 # 7 days
@@ -50,3 +51,8 @@ jwt:
 firebase:
   config:
     path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
+
+app:
+  kafka:
+    topic:
+      fcm-token: ${KAFKA_FCM_TOKEN_TOPIC:fcm-token-events}

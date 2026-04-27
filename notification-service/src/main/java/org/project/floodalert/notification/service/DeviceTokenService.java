@@ -6,4 +6,6 @@ public interface DeviceTokenService {
     void saveToken(UUID userId, String token);
 
     void removeToken(UUID userId);
+
+    void handleFcmTokenEvent(UUID userId, String token, Boolean isActive);
 }

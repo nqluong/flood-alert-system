@@ -29,7 +29,7 @@ public class FileUploadController {
     @GetMapping("/upload-url")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<FileUploadResponse>> getUploadUrl(
-            @RequestParam @NotBlank(message = "Extension không được để trống") String extension) {
+            @RequestParam("extension") @NotBlank(message = "Extension không được để trống") String extension) {
         
         UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
         log.info("GET /api/v1/reports/upload-url - userId={}, extension={}", userId, extension);

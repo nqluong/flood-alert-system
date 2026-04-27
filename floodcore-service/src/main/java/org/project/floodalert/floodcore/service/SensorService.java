@@ -1,8 +1,10 @@
 package org.project.floodalert.floodcore.service;
 
 import org.project.floodalert.common.dto.response.PageResponse;
+import org.project.floodalert.floodcore.dto.request.BatchCreateSensorRequest;
 import org.project.floodalert.floodcore.dto.request.CreateSensorRequest;
 import org.project.floodalert.floodcore.dto.request.SensorFilterRequest;
+import org.project.floodalert.floodcore.dto.response.BatchCreateSensorResponse;
 import org.project.floodalert.floodcore.dto.response.CreateSensorResponse;
 import org.project.floodalert.floodcore.dto.response.SensorDetailResponse;
 import org.project.floodalert.floodcore.dto.response.SensorMapResponse;
@@ -18,6 +20,14 @@ public interface SensorService {
      * @return Thông tin sensor vừa tạo kèm API Key
      */
     CreateSensorResponse createSensor(CreateSensorRequest request, UUID performedBy);
+
+    /**
+     * Tạo nhiều sensor cùng lúc
+     * @param request Danh sách sensor cần tạo
+     * @param performedBy ID người thực hiện
+     * @return Kết quả tạo từng sensor (thành công/thất bại)
+     */
+    BatchCreateSensorResponse batchCreateSensors(BatchCreateSensorRequest request, UUID performedBy);
 
     /**
      * Lấy danh sách sensor với phân trang và filter

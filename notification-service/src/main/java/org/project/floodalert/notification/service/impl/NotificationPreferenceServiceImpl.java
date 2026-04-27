@@ -17,7 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class NotificationPreferenceServiceImpl implements NotificationPreferenceService {
 
-    private static final Integer DEFAULT_ALERT_RADIUS = 500;
+    private static final Integer DEFAULT_ALERT_RADIUS = 1000;
     private static final Boolean DEFAULT_ENABLED = true;
 
     private final NotificationPreferenceRepository notificationPreferenceRepository;

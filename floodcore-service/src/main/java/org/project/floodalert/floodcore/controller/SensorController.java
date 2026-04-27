@@ -8,6 +8,7 @@ import org.project.floodalert.common.dto.response.PageResponse;
 import org.project.floodalert.common.security.SecurityContextUtils;
 import org.project.floodalert.common.security.annotation.RequireOwnershipOrAdmin;
 import org.project.floodalert.floodcore.dto.request.CreateSensorRequest;
+import org.project.floodalert.floodcore.dto.request.BatchCreateSensorRequest;
 import org.project.floodalert.floodcore.dto.request.ChangeStatusRequest;
 import org.project.floodalert.floodcore.dto.request.DeleteSensorRequest;
 import org.project.floodalert.floodcore.dto.request.SensorFilterRequest;
@@ -32,7 +33,7 @@ public class SensorController {
     private final SensorUpdateService sensorUpdateService;
 
     /**
-     * API tạo mới sensor (Provisioning)
+     * API tạo mới sensor
      *
      * @param request Thông tin sensor cần tạo
      * @return Thông tin sensor vừa tạo kèm API Key
@@ -50,6 +51,30 @@ public class SensorController {
 
         log.info("API POST /api/v1/sensors - Tạo sensor thành công: {}",
                 response.getSensorId());
+
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.success(response));
+    }
+
+    /**
+     * API tạo nhiều sensor cùng lúc
+     *
+     * @param request Danh sách sensor cần tạo
+     * @return Kết quả tạo từng sensor (thành công/thất bại)
+     */
+    @PostMapping("/batch")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<BatchCreateSensorResponse>> batchCreateSensors(
+            @Valid @RequestBody BatchCreateSensorRequest request) {
+
+        UUID userId = SecurityContextUtils.getCurrentUserIdAsUUID();
+        log.info("User ID thực hiện: {}", userId);
+        log.info("API POST /api/v1/sensors/batch - Tạo batch {} sensors", request.getSensors().size());
+
+        BatchCreateSensorResponse response = sensorService.batchCreateSensors(request, userId);
+
+        log.info("API POST /api/v1/sensors/batch - Hoàn thành: {} thành công, {} thất bại",
+                response.getSuccessCount(), response.getFailureCount());
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success(response));
