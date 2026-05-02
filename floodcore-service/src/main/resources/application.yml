@@ -57,3 +57,8 @@ firebase:
     bucket-name: ${FIREBASE_STORAGE_BUCKET:flood-alert-c4f24.firebasestorage.app}
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:classpath:firebase-key.json}
     signed-url-duration-minutes: ${FIREBASE_SIGNED_URL_DURATION:15}
+
+integration:
+  ors:
+    api-url: "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
+    api-key: ${ORS_API_KEY}

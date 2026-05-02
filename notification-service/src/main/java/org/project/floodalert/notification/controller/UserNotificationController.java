@@ -1,7 +1,9 @@
 package org.project.floodalert.notification.controller;
 
+import com.google.protobuf.Api;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.project.floodalert.common.dto.response.ApiResponse;
 import org.project.floodalert.common.security.InternalUserDetails;
 import org.project.floodalert.notification.dto.response.NotificationListResponse;
 import org.project.floodalert.notification.dto.response.UnreadCountResponse;
@@ -29,10 +31,10 @@ public class UserNotificationController {
      * @return Danh sách thông báo với pagination info
      */
     @GetMapping
-    public ResponseEntity<NotificationListResponse> getNotifications(
+    public ResponseEntity<ApiResponse<NotificationListResponse>> getNotifications(
             Authentication authentication,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         
         UUID userId = extractUserId(authentication);
         log.info("[UserNotificationController] GET /api/v1/notifications - userId={}, page={}, size={}", 
@@ -40,7 +42,7 @@ public class UserNotificationController {
 
         NotificationListResponse response = userNotificationService.getUserNotifications(userId, page, size);
         
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -49,13 +51,13 @@ public class UserNotificationController {
      * @return Số lượng thông báo chưa đọc
      */
     @GetMapping("/unread-count")
-    public ResponseEntity<UnreadCountResponse> getUnreadCount(Authentication authentication) {
+    public ResponseEntity<ApiResponse<UnreadCountResponse>> getUnreadCount(Authentication authentication) {
         UUID userId = extractUserId(authentication);
         log.info("[UserNotificationController] GET /api/v1/notifications/unread-count - userId={}", userId);
 
         UnreadCountResponse response = userNotificationService.getUnreadCount(userId);
-        
-        return ResponseEntity.ok(response);
+
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     /**
@@ -64,9 +66,9 @@ public class UserNotificationController {
      * @param notificationId ID của thông báo
      */
     @PutMapping("/{notificationId}/read")
-    public ResponseEntity<Void> markAsRead(
+    public ResponseEntity<ApiResponse<Void>> markAsRead(
             Authentication authentication,
-            @PathVariable UUID notificationId) {
+            @PathVariable(name = "notificationId") UUID notificationId) {
         
         UUID userId = extractUserId(authentication);
         log.info("[UserNotificationController] PUT /api/v1/notifications/{}/read - userId={}", 
@@ -74,20 +76,26 @@ public class UserNotificationController {
 
         userNotificationService.markAsRead(userId, notificationId);
         
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("Notification marked as read")
+                .build());
     }
 
     /**
      * Đánh dấu tất cả thông báo đã đọc
      */
     @PutMapping("/read-all")
-    public ResponseEntity<Void> markAllAsRead(Authentication authentication) {
+    public ResponseEntity<ApiResponse<Void>> markAllAsRead(Authentication authentication) {
         UUID userId = extractUserId(authentication);
         log.info("[UserNotificationController] PUT /api/v1/notifications/read-all - userId={}", userId);
 
         userNotificationService.markAllAsRead(userId);
         
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .success(true)
+                .message("All notifications marked as read")
+                .build());
     }
 
 

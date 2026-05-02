@@ -52,6 +52,4 @@ public class FcmTokenController {
                 .message("All FCM tokens deactivated successfully")
                 .build());
     }
-
-
 }

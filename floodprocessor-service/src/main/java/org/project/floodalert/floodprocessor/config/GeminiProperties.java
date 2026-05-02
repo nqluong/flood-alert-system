@@ -16,7 +16,7 @@ public class GeminiProperties {
 
     private String model;
 
-    private int timeoutSeconds = 5;
+    private int timeoutSeconds = 60;
 
     private RetryConfig retry = new RetryConfig();
 

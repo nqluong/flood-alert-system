@@ -9,14 +9,21 @@ import org.project.floodalert.floodprocessor.dto.request.ReportMessage;
 import org.project.floodalert.floodprocessor.dto.response.GeminiVisionResponse;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Component;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.ExchangeStrategies;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
+import java.net.URI;
 import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeoutException;
 
 @Slf4j
 @Component
@@ -37,13 +44,24 @@ public class GeminiWebClientImpl implements GeminiApiClient {
     public GeminiWebClientImpl(GeminiProperties geminiProperties, ObjectMapper objectMapper) {
         this.geminiProperties = geminiProperties;
         this.objectMapper = objectMapper;
+        HttpClient httpClient = HttpClient.create()
+                .responseTimeout(Duration.ofSeconds(geminiProperties.getTimeoutSeconds()));
 
         this.geminiWebClient = WebClient.builder()
                 .baseUrl(geminiProperties.getBaseUrl())
+                .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .defaultHeader("Content-Type", MediaType.APPLICATION_JSON_VALUE)
                 .defaultHeader("Accept", MediaType.APPLICATION_JSON_VALUE)
                 .build();
-        this.imageDownloadClient = WebClient.builder().build();
+        ExchangeStrategies strategies = ExchangeStrategies.builder()
+                .codecs(configurer -> configurer
+                        .defaultCodecs()
+                        .maxInMemorySize(10 * 1024 * 1024))
+                .build();
+
+        this.imageDownloadClient = WebClient.builder()
+                .exchangeStrategies(strategies)
+                .build();
     }
 
     @Override
@@ -115,26 +133,26 @@ public class GeminiWebClientImpl implements GeminiApiClient {
                 .block();
     }
 
-    private reactor.core.publisher.Mono<? extends Throwable> handle4xxError(
-            org.springframework.web.reactive.function.client.ClientResponse clientResponse) {
+    private Mono<? extends Throwable> handle4xxError(
+            ClientResponse clientResponse) {
         return clientResponse.bodyToMono(String.class).flatMap(body -> {
             int statusCode = clientResponse.statusCode().value();
             log.error("[GEMINI] Lỗi 4xx: status={}, body={}", statusCode, body);
             
             if (statusCode == 429) {
-                return reactor.core.publisher.Mono.error(
+                return Mono.error(
                     new RetryableException("Rate limit: " + statusCode)
                 );
             }
             
-            return reactor.core.publisher.Mono.error(
+            return Mono.error(
                 new RuntimeException("Gemini API client error: " + statusCode + " - " + body)
             );
         });
     }
 
-    private reactor.core.publisher.Mono<? extends Throwable> handle5xxError(
-            org.springframework.web.reactive.function.client.ClientResponse serverResponse) {
+    private Mono<? extends Throwable> handle5xxError(
+            ClientResponse serverResponse) {
         int statusCode = serverResponse.statusCode().value();
         log.error("[GEMINI] Lỗi 5xx: status={}", statusCode);
         return reactor.core.publisher.Mono.error(
@@ -157,7 +175,7 @@ public class GeminiWebClientImpl implements GeminiApiClient {
 
     private long handleTimeoutError(int attempt, int maxAttempts, String reportId, 
                                     IllegalStateException e, long currentDelayMs) {
-        if (e.getCause() instanceof java.util.concurrent.TimeoutException) {
+        if (e.getCause() instanceof TimeoutException) {
             if (attempt < maxAttempts) {
                 log.warn("[GEMINI] Attempt {}/{} timeout cho reportId={} - Retry sau {}ms",
                         attempt, maxAttempts, reportId, currentDelayMs);
@@ -217,7 +235,7 @@ public class GeminiWebClientImpl implements GeminiApiClient {
             }
             
             byte[] imageBytes = imageDownloadClient.get()
-                    .uri(imageUrl)
+                    .uri(URI.create(imageUrl))
                     .retrieve()
                     .onStatus(HttpStatusCode::is4xxClientError, clientResponse -> {
                         log.error("[GEMINI] Lỗi 4xx khi tải ảnh: status={}, url={}", 

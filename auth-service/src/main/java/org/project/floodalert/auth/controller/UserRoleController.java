@@ -35,8 +35,8 @@ public class UserRoleController {
     @DeleteMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> removeRole(
-            @RequestParam UUID userId,
-            @RequestParam UUID roleId) {
+            @RequestParam(name = "userId") UUID userId,
+            @RequestParam(name = "roleId") UUID roleId) {
         userRoleService.removeRole(userId, roleId);
         return ResponseEntity.ok(ApiResponse.success("Xóa role thành công", null));
     }

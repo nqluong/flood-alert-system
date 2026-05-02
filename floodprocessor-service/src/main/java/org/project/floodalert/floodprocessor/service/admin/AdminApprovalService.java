@@ -1,11 +1,5 @@
 package org.project.floodalert.floodprocessor.service.admin;
 
-import java.util.UUID;
-
-/**
- * Service xử lý Admin manual approval/rejection cho FloodEvent.
- * Dùng cho trường hợp Admin cần duyệt hoặc từ chối báo cáo ngập lụt thủ công.
- */
 public interface AdminApprovalService {
 
     /**

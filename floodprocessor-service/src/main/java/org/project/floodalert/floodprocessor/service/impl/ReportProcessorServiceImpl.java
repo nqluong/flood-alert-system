@@ -3,6 +3,7 @@ package org.project.floodalert.floodprocessor.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
+import org.project.floodalert.floodprocessor.dto.event.ReportStatusUpdateEvent;
 import org.project.floodalert.floodprocessor.dto.event.ReputationUpdateEvent;
 import org.project.floodalert.floodprocessor.dto.request.ReportMessage;
 import org.project.floodalert.floodprocessor.dto.request.UserReportEvent;
@@ -54,6 +55,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
     @Value("${app.kafka.topic.lifecycle}")
     private String lifecycleTopic;
+
+    @Value("${app.kafka.topic.report-status:report-status-update}")
+    private String reportStatusTopic;
 
     /**
      * Entry point: Xử lý UserReportEvent từ Kafka.
@@ -129,6 +133,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
      *   <li>Gọi ScoringEngine -> lấy ScoringResult (totalScore, aiScore, etc.)</li>
      *   <li>Gọi PersistenceService.handleNewReport -> tạo FloodEvent + TrustScore</li>
      *   <li>Xử lý gamification theo status (REJECTED/PENDING/ACTIVE)</li>
+     *   <li>Bắn ReportStatusUpdateEvent về flood-core</li>
      * </ol>
      */
     private void handleNewReportScoring(ReportMessage msg) {
@@ -147,10 +152,17 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
             publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
                     ReputationReason.AUTO_REJECTED, POINTS_AUTO_REJECTED, msg.getReportId());
 
+            // Bắn event cập nhật status = REJECTED về flood-core
+            publishReportStatusEvent(msg, STATUS_REJECTED, newEvent.getEventId(), 
+                    "Điểm số quá thấp (score < 0.5)", totalScore);
+
         } else if (STATUS_PENDING.equals(newEvent.getStatus())) {
             // PENDING -> Hold reward (Delayed Reward Mechanism)
             log.info("[GAMIFICATION][SCENARIO-2] PENDING: reportId={}, userId={}, score={} → Hold reward, chờ approval",
                     msg.getReportId(), msg.getUserId(), totalScore);
+
+            // Bắn event cập nhật status = PENDING về flood-core
+            publishReportStatusEvent(msg, STATUS_PENDING, newEvent.getEventId(), null, totalScore);
 
         } else if (STATUS_ACTIVE.equals(newEvent.getStatus())) {
             // Event mới ngay lập tức ACTIVE (score >= 0.8) -> Reward PIONEER ngay
@@ -161,6 +173,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
             publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
                     ReputationReason.CLUSTER_APPROVED, POINTS_PIONEER_APPROVED, msg.getReportId());
+
+            // Bắn event cập nhật status = APPROVED về flood-core
+            publishReportStatusEvent(msg, "APPROVED", newEvent.getEventId(), null, totalScore);
 
             log.info("[REPORT-PROCESSOR][NEW-REPORT] Hoàn tất: eventId={}, status={}, score={}",
                     newEvent.getEventId(), newEvent.getStatus(), totalScore);
@@ -176,6 +191,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
      *   <li>Gọi PersistenceService.handleFastUpdate → chỉ tăng vote_count</li>
      *   <li>Gamification: Reward +2 điểm (ACTIVE_CONFIRMATION)</li>
      *   <li>Bắn Kafka UPDATED event</li>
+     *   <li>Bắn ReportStatusUpdateEvent = APPROVED về flood-core</li>
      * </ol>
      */
     private void handleFastClusterUpdate(ReportMessage msg, String existingEventId) {
@@ -195,6 +211,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
         // Bắn Kafka UPDATED event
         publishLifecycleEvent(updatedEvent, LifecycleEventType.UPDATED);
 
+        // Bắn event cập nhật status = APPROVED về flood-core (fast path không có score)
+        publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, null);
+
         log.info("[REPORT-PROCESSOR][FAST-UPDATE] Hoàn tất: eventId={}, vote_count={}",
                 updatedEvent.getEventId(), updatedEvent.getVoteCount());
     }
@@ -208,6 +227,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
      *   <li>Gọi PersistenceService.handleClusterUpdate -> cập nhật điểm + check transition</li>
      *   <li>Nếu PENDING→ACTIVE: Reward TẤT CẢ contributors</li>
      *   <li>Bắn Kafka UPDATED event</li>
+     *   <li>Bắn ReportStatusUpdateEvent về flood-core</li>
      * </ol>
      */
     private void handlePendingClusterUpdate(ReportMessage msg, String existingEventId) {
@@ -259,6 +279,13 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                 publishReputationEvent(contributor.getUserId(), updatedEvent.getEventId(),
                         ReputationReason.CLUSTER_APPROVED, points, msg.getReportId());
             }
+
+            // Bắn event cập nhật status = APPROVED về flood-core (PENDING -> ACTIVE)
+            publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, newScore);
+
+        } else {
+            // Vẫn còn PENDING -> giữ nguyên status PENDING
+            publishReportStatusEvent(msg, STATUS_PENDING, updatedEvent.getEventId(), null, newScore);
         }
 
         // Bắn Kafka UPDATED event
@@ -321,6 +348,30 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
             // Log-only, don't throw (gamification là phụ, không nên fail main flow)
             log.error("[REPUTATION] Publish failed (non-critical): userId={}, reason={}: {}",
                       userId, reason, e.getMessage(), e);
+        }
+    }
+
+
+    private void publishReportStatusEvent(ReportMessage msg, String status, 
+                                         String eventId, String rejectReason, Double score) {
+        try {
+            ReportStatusUpdateEvent event = ReportStatusUpdateEvent.builder()
+                    .reportId(msg.getReportId())
+                    .userId(msg.getUserId())
+                    .status(status)
+                    .eventId(eventId)
+                    .rejectReason(rejectReason)
+                    .score(score)
+                    .build();
+
+            kafkaTemplate.send(reportStatusTopic, msg.getReportId(), event);
+
+            log.info("[REPORT-STATUS] Published: reportId={}, status={}, eventId={}, score={}",
+                    msg.getReportId(), status, eventId, score);
+
+        } catch (Exception e) {
+            log.error("[REPORT-STATUS] Publish failed (non-critical): reportId={}, status={}: {}",
+                      msg.getReportId(), status, e.getMessage(), e);
         }
     }
 }

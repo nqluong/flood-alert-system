@@ -4,6 +4,7 @@ import lombok.AccessLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
+import org.project.floodalert.auth.dto.request.UserSearchRequest;
 import org.project.floodalert.auth.dto.response.UserListResponse;
 import org.project.floodalert.auth.model.User;
 import org.project.floodalert.auth.model.UserProfile;
@@ -11,9 +12,11 @@ import org.project.floodalert.auth.repository.UserProfileRepository;
 import org.project.floodalert.auth.repository.UserRepository;
 import org.project.floodalert.auth.repository.UserRoleRepository;
 import org.project.floodalert.auth.service.UserManagementService;
+import org.project.floodalert.auth.specification.UserSpecification;
 import org.project.floodalert.common.dto.response.PageResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,12 +39,23 @@ public class UserManagementServiceImpl implements UserManagementService {
     @Transactional(readOnly = true)
     public PageResponse<UserListResponse> getAllUsers(Pageable pageable) {
         Page<User> userPage = userRepository.findAll(pageable);
-        
+        return buildPageResponse(userPage);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<UserListResponse> searchUsers(UserSearchRequest searchRequest, Pageable pageable) {
+        Specification<User> specification = UserSpecification.withFilters(searchRequest);
+        Page<User> userPage = userRepository.findAll(specification, pageable);
+        return buildPageResponse(userPage);
+    }
+
+    private PageResponse<UserListResponse> buildPageResponse(Page<User> userPage) {
         if (userPage.isEmpty()) {
             return PageResponse.of(
                 List.of(),
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
+                userPage.getNumber(),
+                userPage.getSize(),
                 0L,
                 0
             );

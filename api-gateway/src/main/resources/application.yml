@@ -31,7 +31,8 @@ spring:
             - Path=/flood-alert/api/v1/auth/**,
               /flood-alert/api/v1/roles/**,
               /flood-alert/api/v1/user-roles/**,
-              /flood-alert/api/v1/users/**
+              /flood-alert/api/v1/users/**,
+              /flood-alert/api/v1/fcm-tokens/**
           filters:
             - StripPrefix=1
 
@@ -44,6 +45,7 @@ spring:
               /flood-alert/api/v1/sensors/**,
               /flood-alert/api/v1/admin/floods/**,
               /flood-alert/api/v1/core/floods/**,
+              /flood-alert/api/v1/core/routes/**,
               /flood-alert/api/v1/reports/**,
           filters:
             - StripPrefix=1

@@ -56,7 +56,7 @@ public class ReportScoringEngine {
                     double rawScore = strategy.calculateScore(msg);
                     double weight = getDynamicWeight(strategy.getStrategyName(), hasImage);
                     double weightedScore = rawScore * weight;
-                    log.debug("[SCORING-ENGINE] Strategy={} → rawScore={}, weight={}, weightedScore={}",
+                    log.info("[SCORING-ENGINE] Strategy={} → rawScore={}, weight={}, weightedScore={}",
                             strategy.getStrategyName(), rawScore, weight, weightedScore);
                     return new StrategyScore(strategy.getStrategyName(), rawScore, weightedScore);
                 }, virtualThreadExecutor))

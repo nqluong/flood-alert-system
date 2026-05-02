@@ -1,12 +1,5 @@
 package org.project.floodalert.floodprocessor.utils;
 
-/**
- * Utility đơn giản để tạo GeoHash từ tọa độ lat/lon.
- * Sử dụng cho anti-spam key generation.
- *
- * <p>GeoHash là chuỗi base32 mã hóa vị trí địa lý thành grid cells.
- * Độ dài 7 ký tự tương đương khoảng 153m x 153m.</p>
- */
 public class GeoHashUtil {
 
     private static final String BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
@@ -65,13 +58,6 @@ public class GeoHashUtil {
         return geohash.toString();
     }
 
-    /**
-     * Tạo GeoHash với độ dài mặc định 7 ký tự (khoảng 153m precision).
-     *
-     * @param lat Latitude
-     * @param lon Longitude
-     * @return GeoHash string độ dài 7
-     */
     public static String encode(double lat, double lon) {
         return encode(lat, lon, 7);
     }

@@ -25,6 +25,7 @@ public enum CoreErrorCode implements BaseErrorCode {
     INVALID_FILE_EXTENSION(4012, "Định dạng file không hợp lệ", HttpStatus.BAD_REQUEST),
 
     REDIS_SYNC_FAILED(5001, "Đồng bộ dữ liệu Redis thất bại", HttpStatus.INTERNAL_SERVER_ERROR),
+    EXTERNAL_SERVICE_ERROR(5004, "Lỗi khi gọi dịch vụ bên ngoài", HttpStatus.SERVICE_UNAVAILABLE),
 
     DATABASE_ERROR(5002, "Lỗi cơ sở dữ liệu", HttpStatus.INTERNAL_SERVER_ERROR),
 
