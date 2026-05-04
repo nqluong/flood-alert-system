@@ -11,7 +11,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.project.floodalert.floodprocessor.dto.request.ReportMessage;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
-import org.project.floodalert.floodprocessor.service.scoring.SpatialConsensusScoringStrategy;
+import org.project.floodalert.floodprocessor.service.scoring.impl.SpatialConsensusScoringStrategy;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

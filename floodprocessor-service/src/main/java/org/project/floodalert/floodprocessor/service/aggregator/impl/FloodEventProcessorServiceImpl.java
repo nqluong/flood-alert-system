@@ -4,13 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
 import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
-import org.project.floodalert.floodprocessor.enums.FloodStatus;
+import org.project.floodalert.floodprocessor.messaging.publisher.LifecycleEventPublisher;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService.FloodEventDbResult;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventProcessorService;
-import org.project.floodalert.floodprocessor.service.aggregator.FloodGeoCacheService;
-import org.project.floodalert.floodprocessor.service.aggregator.LifecycleEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;

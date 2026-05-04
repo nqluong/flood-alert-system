@@ -1,17 +1,14 @@
 package org.project.floodalert.floodprocessor.dto.request;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
-import lombok.AccessLevel;
 
 import java.time.Instant;
 
 /**
- * DTO ánh xạ message nhận từ ingestion-service qua Kafka topic ingest.
- * rawPayload chứa JSON string của SensorRaw gốc từ thiết bị.
+ * Message nhận từ Kafka topic
+ * Chứa sensor data đã được parse và validate ở ingestion-service
  */
 @Data
 @Builder
@@ -19,8 +16,16 @@ import java.time.Instant;
 @AllArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class SensorMessage {
+    
+    @JsonProperty("sensor_id")
     String sensorId;
-    String rawPayload;
+    
+    @JsonProperty("sensor_data")
+    SensorRaw sensorData;  // DTO đã validated (thay vì rawPayload String)
+    
+    @JsonProperty("topic")
     String topic;
+    
+    @JsonProperty("received_at")
     Instant receivedAt;
 }

@@ -9,13 +9,13 @@ import org.project.floodalert.floodprocessor.enums.ContributorRole;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.enums.ReputationReason;
 import org.project.floodalert.floodprocessor.exception.ProcessorErrorCode;
+import org.project.floodalert.floodprocessor.messaging.publisher.LifecycleEventPublisher;
+import org.project.floodalert.floodprocessor.messaging.publisher.ReputationEventPublisher;
 import org.project.floodalert.floodprocessor.model.EventContributor;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
 import org.project.floodalert.floodprocessor.service.admin.AdminApprovalService;
-import org.project.floodalert.floodprocessor.service.aggregator.LifecycleEventPublisher;
-import org.project.floodalert.floodprocessor.service.gamification.ReputationEventPublisher;
-import org.project.floodalert.floodprocessor.service.impl.FloodEventPersistenceService;
+import org.project.floodalert.floodprocessor.service.persistence.FloodEventPersistenceService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -47,12 +47,12 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
     public void approveEvent(String eventId) {
         log.info("[ADMIN-APPROVAL] Bắt đầu duyệt flood event: eventId={}", eventId);
 
-        // 1. Tìm FloodEvent
+        // Tìm FloodEvent
         FloodEvent event = findFloodEventByEventId(eventId);
         log.info("[ADMIN-APPROVAL] Tìm thấy event: id={}, status={}, confidenceScore={}",
                 event.getId(), event.getStatus(), event.getConfidenceScore());
 
-        // 2. Update status = ACTIVE, confidenceScore = 1.0, confirmedAt = now
+        // Update status = ACTIVE, confidenceScore = 1.0, confirmedAt = now
         event.setStatus(STATUS_ACTIVE);
         event.setConfidenceScore(ADMIN_APPROVED_SCORE);
         event.setConfirmedAt(LocalDateTime.now(ZoneId.systemDefault()));
@@ -60,11 +60,11 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
         log.info("[ADMIN-APPROVAL] Đã update event: status={}, confidenceScore={}, confirmedAt={}",
                 savedEvent.getStatus(), savedEvent.getConfidenceScore(), savedEvent.getConfirmedAt());
 
-        // 3. Lấy tất cả contributors
+        // Lấy tất cả contributors
         List<EventContributor> contributors = persistenceService.getContributorsByEventId(event.getId());
         log.info("[ADMIN-APPROVAL] Tìm thấy {} contributors", contributors.size());
 
-        // 4. Bắn Kafka Reputation Event cho từng contributor
+        // Bắn Kafka Reputation Event cho từng contributor
         for (EventContributor contributor : contributors) {
             int rewardPoints = calculateRewardPoints(contributor.getRole());
 
@@ -73,7 +73,7 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                     .eventId(eventId)
                     .reason(ReputationReason.ADMIN_APPROVED)
                     .points(rewardPoints)
-                    .reportId(null) // Admin approval không có reportId cụ thể
+                    .reportId(null)
                     .timestamp(LocalDateTime.now())
                     .build();
 
@@ -82,7 +82,7 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                     contributor.getUserId(), contributor.getRole(), rewardPoints);
         }
 
-        // 5. Bắn Kafka Lifecycle Event: UPDATED
+        // Bắn Kafka Lifecycle Event: UPDATED
         FloodLifecycleEvent lifecycleEvent = FloodLifecycleEvent.builder()
                 .eventId(eventId)
                 .type(LifecycleEventType.UPDATED)
@@ -104,28 +104,28 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
     public void rejectEvent(String eventId) {
         log.info("[ADMIN-REJECTION] Bắt đầu từ chối flood event: eventId={}", eventId);
 
-        // 1. Tìm FloodEvent
+        // Tìm FloodEvent
         FloodEvent event = findFloodEventByEventId(eventId);
         log.info("[ADMIN-REJECTION] Tìm thấy event: id={}, status={}, confidenceScore={}",
                 event.getId(), event.getStatus(), event.getConfidenceScore());
 
-        // 2. Update status = REJECTED
+        // Update status = REJECTED
         event.setStatus(STATUS_REJECTED);
         FloodEvent savedEvent = floodEventRepository.save(event);
         log.info("[ADMIN-REJECTION] Đã update event: status={}", savedEvent.getStatus());
 
-        // 3. Lấy tất cả contributors
+        // Lấy tất cả contributors
         List<EventContributor> contributors = persistenceService.getContributorsByEventId(event.getId());
         log.info("[ADMIN-REJECTION] Tìm thấy {} contributors để phạt điểm", contributors.size());
 
-        // 4. Bắn Kafka Reputation Event phạt điểm cho từng contributor
+        // Bắn Kafka Reputation Event phạt điểm cho từng contributor
         for (EventContributor contributor : contributors) {
             ReputationUpdateEvent reputationEvent = ReputationUpdateEvent.builder()
                     .userId(contributor.getUserId())
                     .eventId(eventId)
                     .reason(ReputationReason.ADMIN_REJECTED)
                     .points(REJECTION_PENALTY_POINTS)
-                    .reportId(null) // Admin rejection không có reportId cụ thể
+                    .reportId(null)
                     .timestamp(LocalDateTime.now())
                     .build();
 
@@ -137,10 +137,6 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
         log.info("[ADMIN-REJECTION] Hoàn tất từ chối flood event: eventId={}", eventId);
     }
 
-    /**
-     * Tìm FloodEvent theo eventId.
-     * Throw AppException nếu không tìm thấy.
-     */
     private FloodEvent findFloodEventByEventId(String eventId) {
         return floodEventRepository.findAll().stream()
                 .filter(e -> e.getEventId().equals(eventId))
@@ -154,11 +150,6 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                 });
     }
 
-    /**
-     * Tính điểm thưởng dựa trên role của contributor.
-     * PIONEER: +5 điểm
-     * VERIFIER: +2 điểm
-     */
     private int calculateRewardPoints(String role) {
         if (ContributorRole.PIONEER.name().equals(role)) {
             return PIONEER_REWARD_POINTS;
