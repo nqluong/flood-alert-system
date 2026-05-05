@@ -62,3 +62,7 @@ integration:
   ors:
     api-url: "https://api.openrouteservice.org/v2/directions/driving-car/geojson"
     api-key: ${ORS_API_KEY}
+logging:
+  level:
+    org.apache.kafka: WARN
+    org.springframework.kafka: INFO

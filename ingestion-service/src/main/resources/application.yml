@@ -37,3 +37,7 @@ kafka:
     acks: ${KAFKA_PRODUCER_ACKS:all}
     retries: ${KAFKA_PRODUCER_RETRIES:3}
 
+logging:
+  level:
+    org.apache.kafka: WARN
+    org.springframework.kafka: INFO

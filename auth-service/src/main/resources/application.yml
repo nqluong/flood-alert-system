@@ -56,3 +56,8 @@ app:
   kafka:
     topic:
       fcm-token: ${KAFKA_FCM_TOKEN_TOPIC:fcm-token-events}
+
+logging:
+  level:
+    org.apache.kafka: WARN
+    org.springframework.kafka: INFO

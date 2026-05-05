@@ -71,11 +71,14 @@ app:
 
   notification:
     dispatch:
-      fixed-delay: 2000  # Run every 2 seconds (in milliseconds)
-      batch-size: 500    # Process up to 500 notifications per batch
+      fixed-delay: 2000
+      batch-size: 500
 
     retry:
-      max-retries: 3             # Maximum retry attempts
-      retry-delay-minutes: 5     # Delay between retries (in minutes)
-      cron: "0 * * * * *"        # Run every minute
-
+      max-retries: 3
+      retry-delay-minutes: 5
+      cron: "0 * * * * *"
+logging:
+  level:
+    org.apache.kafka: WARN
+    org.springframework.kafka: INFO
