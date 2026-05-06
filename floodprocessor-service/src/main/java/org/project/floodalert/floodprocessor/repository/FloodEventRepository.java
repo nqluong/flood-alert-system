@@ -1,6 +1,8 @@
 package org.project.floodalert.floodprocessor.repository;
 
 import org.project.floodalert.floodprocessor.model.FloodEvent;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -94,5 +96,43 @@ public interface FloodEventRepository extends JpaRepository<FloodEvent, UUID> {
             @Param("lon") double lon,
             @Param("radiusKm") double radiusKm,
             @Param("since") LocalDateTime since);
+
+
+    @Query("""
+            SELECT e FROM FloodEvent e
+            WHERE e.source = 'USER_REPORT'
+              AND e.status = 'PENDING'
+              AND e.createdAt < :cutoffTime
+            ORDER BY e.createdAt ASC
+            """)
+    Page<FloodEvent> findPendingUserReportsOlderThan(
+            @Param("cutoffTime") LocalDateTime cutoffTime,
+            Pageable pageable);
+
+    @Query("""
+            SELECT e FROM FloodEvent e
+            WHERE e.source = 'USER_REPORT'
+              AND e.status IN ('ACTIVE', 'CONFIRMED')
+              AND e.updatedAt < :cutoffTime
+            ORDER BY e.updatedAt ASC
+            """)
+    Page<FloodEvent> findActiveUserReportsWithoutRecentUpdate(
+            @Param("cutoffTime") LocalDateTime cutoffTime,
+            Pageable pageable);
+
+    @Query(value = """
+            SELECT * FROM flood_processor.flood_events
+            WHERE source IN ('SENSOR', 'IOT')
+              AND status IN ('PENDING', 'CONFIRMED')
+              AND ST_DistanceSphere(
+                    ST_MakePoint(lon::double precision, lat::double precision),
+                    ST_MakePoint(:lon, :lat)
+                  ) <= (:radiusKm * 1000)
+            ORDER BY updated_at DESC
+            """, nativeQuery = true)
+    List<FloodEvent> findActiveSensorEventsNearby(
+            @Param("lat") double lat,
+            @Param("lon") double lon,
+            @Param("radiusKm") double radiusKm);
 
 }

@@ -10,12 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 
-/**
- * Service xử lý batch sensor data từ Kafka
- * Thực hiện: Extract → Enrich → Validate → Handover to Business Logic
- * 
- * Note: Data đã được parse & validate ở ingestion-service
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -38,8 +32,7 @@ public class SensorDataBatchProcessor {
             // Extract sensor IDs (không cần parse nữa!)
             Set<String> sensorIds = extractSensorIds(messages);
 
-            // Bulk Enrichment - lấy thông tin sensor từ Redis
-            Map<String, Map<String, String>> redisDataMap = 
+            Map<String, Map<String, String>> redisDataMap =
                     redisCacheService.bulkFetchSensorInfo(sensorIds);
 
             // Enrich & Validate - kết hợp Kafka data với Redis data
@@ -67,15 +60,23 @@ public class SensorDataBatchProcessor {
         }
     }
 
-    /**
-     * Extract sensor IDs từ messages
-     */
+
     private Set<String> extractSensorIds(List<SensorMessage> messages) {
         Set<String> sensorIds = new HashSet<>();
         for (SensorMessage message : messages) {
-            if (message.getSensorData() != null && 
-                message.getSensorData().getDeviceInfo() != null) {
-                sensorIds.add(message.getSensorData().getDeviceInfo().getSensorId());
+            // Ưu tiên lấy sensorId từ top-level của SensorMessage
+            String sensorId = message.getSensorId();
+            
+            // Fallback: nếu không có ở top-level, lấy từ deviceInfo
+            if (sensorId == null || sensorId.isEmpty()) {
+                if (message.getSensorData() != null && 
+                    message.getSensorData().getDeviceInfo() != null) {
+                    sensorId = message.getSensorData().getDeviceInfo().getSensorId();
+                }
+            }
+            
+            if (sensorId != null && !sensorId.isEmpty()) {
+                sensorIds.add(sensorId);
             }
         }
         return sensorIds;
@@ -92,12 +93,39 @@ public class SensorDataBatchProcessor {
 
         for (SensorMessage message : messages) {
             try {
+                // Null safety checks
+                if (message.getSensorData() == null) {
+                    log.warn("Message có sensorData = null, bỏ qua. Message: {}", message);
+                    continue;
+                }
+                
                 var sensorData = message.getSensorData();
+                
+                if (sensorData.getDeviceInfo() == null) {
+                    log.warn("Message có deviceInfo = null, bỏ qua. SensorData: {}", sensorData);
+                    continue;
+                }
+                
+                if (sensorData.getTelemetry() == null) {
+                    log.warn("Message có telemetry = null, bỏ qua. SensorData: {}", sensorData);
+                    continue;
+                }
+                
                 var deviceInfo = sensorData.getDeviceInfo();
                 var telemetry = sensorData.getTelemetry();
                 var health = sensorData.getHealth();
                 
-                String sensorId = deviceInfo.getSensorId();
+                // Extract sensorId (ưu tiên top-level từ SensorMessage, fallback device_info)
+                String sensorId = message.getSensorId();
+                if (sensorId == null || sensorId.isEmpty()) {
+                    sensorId = deviceInfo.getSensorId();
+                }
+                
+                if (sensorId == null || sensorId.isEmpty()) {
+                    log.warn("Không tìm thấy sensorId trong message, bỏ qua. Message: {}", message);
+                    continue;
+                }
+                
                 Map<String, String> redisData = redisDataMap.get(sensorId);
 
                 // DROP message nếu sensor không được seed/register trong Redis
@@ -114,7 +142,7 @@ public class SensorDataBatchProcessor {
 
                 // Validate Redis data
                 if (warningLevel == null || dangerLevel == null) {
-                    log.warn("Sensor {} thiếu warning_level hoặc danger_level trong Redis, DROP message",
+                    log.warn("Sensor {} thiếu warning_threshold hoặc danger_threshold trong Redis, DROP message",
                             sensorId);
                     continue;
                 }
@@ -145,7 +173,8 @@ public class SensorDataBatchProcessor {
                 enrichedList.add(enriched);
 
             } catch (Exception e) {
-                log.error("Lỗi khi enrich data cho message, bỏ qua: {}", e.getMessage());
+                log.error("Lỗi khi enrich data cho message, bỏ qua. Error: {}, Message: {}", 
+                        e.getMessage(), message, e);
             }
         }
 

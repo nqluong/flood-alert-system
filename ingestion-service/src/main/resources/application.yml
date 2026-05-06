@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: ${SPRING_APPLICATION_NAME:ingention-service}
+    name: ${SPRING_APPLICATION_NAME:ingestion-service}
 
   data:
     redis:

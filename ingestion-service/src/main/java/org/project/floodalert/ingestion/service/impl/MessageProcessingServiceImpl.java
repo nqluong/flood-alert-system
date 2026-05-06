@@ -64,7 +64,7 @@ public class MessageProcessingServiceImpl implements MessageProcessingService {
                     .receivedAt(Instant.now())
                     .build();
             
-            // Step 6: Publish lên Kafka
+            // Publish lên Kafka
             messagePublisher.publish(message);
             
             long processingTime = System.currentTimeMillis() - startTime;

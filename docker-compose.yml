@@ -53,13 +53,13 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: flood-kafka-ui
     ports:
-      - "8090:8080"
+        - "8090:8080"
     environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      # LƯU Ý: Kết nối qua port nội bộ 29092 (như cấu hình ở trên)
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
-    depends_on:
-      - kafka
+        KAFKA_CLUSTERS_0_NAME: FloodAlert-Cloud
+        KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: host.docker.internal:9092
+        KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
+    extra_hosts:
+      - "localhost:host-gateway"
   redis:
     image: redis:latest
     container_name: redis-server

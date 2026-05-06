@@ -25,7 +25,7 @@ public class ZombieFloodSweeperJob {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
 
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedDelay = 180000)
     public void sweepZombieFloodEvents() {
         long timeout = configService.getSensorTimeoutMs();
         long currentTime = System.currentTimeMillis();

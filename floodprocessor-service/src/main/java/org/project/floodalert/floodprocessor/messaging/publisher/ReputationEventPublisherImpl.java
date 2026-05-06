@@ -27,24 +27,9 @@ public class ReputationEventPublisherImpl implements ReputationEventPublisher {
             return;
         }
 
-        // Gửi Kafka với userId làm key để đảm bảo ordering theo user
         String userIdKey = event.getUserId().toString();
-        CompletableFuture<SendResult<String, Object>> future =
-                kafkaTemplate.send(reputationTopic, userIdKey, event);
 
-        // Callback bất đồng bộ để log kết quả
-        future.whenComplete((result, ex) -> {
-            if (ex != null) {
-                log.error("[REPUTATION-PUBLISHER] Gửi thất bại cho user [{}], event [{}], reason [{}]: {}",
-                        event.getUserId(), event.getEventId(), event.getReason(), ex.getMessage());
-            } else {
-                var meta = result.getRecordMetadata();
-                log.info("[REPUTATION-PUBLISHER] Gửi thành công: userId={}, eventId={}, reason={}, " +
-                                "points={}, topic={}, partition={}, offset={}",
-                        event.getUserId(), event.getEventId(), event.getReason(), event.getPoints(),
-                        meta.topic(), meta.partition(), meta.offset());
-            }
-        });
+        kafkaTemplate.send(reputationTopic, userIdKey, event);
 
         log.debug("[REPUTATION-PUBLISHER] Đã đặt lịch gửi: userId={}, reason={}, points={}",
                 event.getUserId(), event.getReason(), event.getPoints());

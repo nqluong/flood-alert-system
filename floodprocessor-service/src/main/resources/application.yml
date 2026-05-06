@@ -72,20 +72,34 @@ app:
         max-poll-records: ${KAFKA_AGGREGATOR_MAX_POLL_RECORDS:100}
 
   sensor-health:
-    # Khoảng thời gian tối thiểu giữa 2 lần đồng bộ health (ms) - mặc định 5 phút
     sync-interval-ms: ${SENSOR_HEALTH_SYNC_INTERVAL_MS:300000}
 
 auth-service:
   url: ${AUTH_SERVICE_URL:http://localhost:8081}
+
+system:
+  config:
+    sensor-timeout-ms: ${SENSOR_TIMEOUT_MS:900000}
+    
+    user-report:
+      pending-timeout-minutes: ${USER_REPORT_PENDING_TIMEOUT_MINUTES:120}
+      
+      decay-interval-minutes: ${USER_REPORT_DECAY_INTERVAL_MINUTES:30}
+      
+      decay-amount: ${USER_REPORT_DECAY_AMOUNT:0.2}
+
+      min-confidence-threshold: ${USER_REPORT_MIN_CONFIDENCE_THRESHOLD:0.3}
+      
+      sensor-crosscheck-radius-meters: ${USER_REPORT_SENSOR_CROSSCHECK_RADIUS_METERS:50}
+      
+      batch-size: ${USER_REPORT_BATCH_SIZE:100}
 
 
 gemini:
   api-key: ${GEMINI_API_KEY}
   base-url: https://generativelanguage.googleapis.com
   model: gemini-2.5-flash
-  # Timeout tối đa cho mỗi lần gọi Gemini (giây). Giữ thấp để không nghẽn Kafka consumer.
   timeout-seconds: 40
-  # Retry configuration
   retry:
     max-attempts: 3  # Số lần retry tối đa (không tính lần gọi đầu tiên)
     initial-delay-ms: 1000  # Delay ban đầu: 1 giây

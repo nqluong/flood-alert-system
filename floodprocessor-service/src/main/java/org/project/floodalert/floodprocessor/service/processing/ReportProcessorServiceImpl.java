@@ -40,7 +40,6 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
     private static final String STATUS_PENDING = "PENDING";
     private static final String STATUS_REJECTED = "REJECTED";
 
-    // Gamification point values
     private static final int POINTS_AUTO_REJECTED = -2;
     private static final int POINTS_PIONEER_APPROVED = 5;
     private static final int POINTS_VERIFIER_APPROVED = 2;
@@ -114,7 +113,6 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
         String geohash = GeoHashUtil.encode(msg.getLat(), msg.getLon());
         String cooldownKey = COOLDOWN_KEY_PREFIX + msg.getUserId() + ":" + geohash;
 
-        // Thử set key với TTL 15 phút. Nếu key đã tồn tại -> spam
         Boolean isNewReport = stringRedisTemplate.opsForValue()
                 .setIfAbsent(cooldownKey, "LOCKED", COOLDOWN_MINUTES, TimeUnit.MINUTES);
 

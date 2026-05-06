@@ -22,10 +22,10 @@ public class SensorDataParserImpl implements SensorDataParser {
 
     @Override
     public SensorDataDTO parse(String jsonPayload) throws Exception {
-        // Step 1: Parse JSON
+        // Parse JSON
         SensorDataDTO dto = objectMapper.readValue(jsonPayload, SensorDataDTO.class);
         
-        // Step 2: Validate using Bean Validation
+        // Validate using Bean Validation
         Set<ConstraintViolation<SensorDataDTO>> violations = validator.validate(dto);
         
         if (!violations.isEmpty()) {
@@ -35,21 +35,18 @@ public class SensorDataParserImpl implements SensorDataParser {
             throw new IllegalArgumentException("Validation failed: " + errors);
         }
         
-        // Step 3: Business validation
         validateBusinessRules(dto);
         
         return dto;
     }
     
-    /**
-     * Validate business rules
-     */
+
     private void validateBusinessRules(SensorDataDTO dto) {
         // Validate water level range
         Double waterLevel = dto.getTelemetry().getWaterLevel();
-        if (waterLevel < 0 || waterLevel > 10) {
+        if (waterLevel < 0) {
             throw new IllegalArgumentException(
-                    "water_level out of range: " + waterLevel + " (expected: 0-10m)");
+                    "water_level out of range: " + waterLevel + " (must be >= 0)");
         }
         
         // Validate coordinates if present
@@ -67,7 +64,6 @@ public class SensorDataParserImpl implements SensorDataParser {
             }
         }
         
-        // Validate battery level if present
         if (dto.getHealth() != null && dto.getHealth().getBatteryLevel() != null) {
             double battery = dto.getHealth().getBatteryLevel();
             if (battery < 0 || battery > 100) {
