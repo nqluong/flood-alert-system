@@ -37,7 +37,7 @@ public class NotificationEventConsumer {
     @KafkaListener(
             topics = "${app.kafka.topic.lifecycle-events}",
             groupId = "notification-push-group",
-            containerFactory = "kafkaListenerContainerFactory"
+            containerFactory = "lifecycleKafkaListenerContainerFactory"
     )
     @Transactional
     public void consumeFloodLifecycleEvent(FloodLifecycleEvent event, Acknowledgment ack) {

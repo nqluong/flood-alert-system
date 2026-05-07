@@ -1,22 +1,54 @@
 version: "3.8"
 
 services:
+  ingestion-service:
+    image: nqluong14/ingestion-service:v1.0
+    container_name: ingestion-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    env_file:
+      - ./ingestion-service/.env
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    networks:
+      - flood-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+
   mqtt-broker:
     image: eclipse-mosquitto:2.0
     container_name: mqtt-broker
     restart: unless-stopped
     ports:
-      - "1883:1883"
-      - "9001:9001"
+      - "1883:1883"   # MQTT port
+      - "9001:9001"   # WebSocket port
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
       - ./mosquitto/log:/mosquitto/log
+    networks:
+      - flood-network
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 128M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   kafka:
     image: apache/kafka:latest
     user: root
-    hostname: kafka  # Đặt tên host là kafka cho dễ gọi
+    hostname: kafka
     container_name: flood-kafka
     restart: unless-stopped
     ports:
@@ -35,69 +67,117 @@ services:
 
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
 
-      # Tối ưu RAM (Quan trọng cho VPS)
-      KAFKA_HEAP_OPTS: "-Xmx512M -Xms256M"
+      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_NUM_PARTITIONS: 3
 
-    volumes:
-      - kafka_data_new:/tmp/kraft-combined-logs
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 300000
 
-    # 4. KAFKA UI
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: flood-kafka-ui
-    ports:
-        - "8090:8080"
-    environment:
-        KAFKA_CLUSTERS_0_NAME: FloodAlert-Cloud
-        KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: host.docker.internal:9092
-        KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL: PLAINTEXT
-    extra_hosts:
-      - "localhost:host-gateway"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - flood-network
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+        reservations:
+          memory: 768M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   redis:
-    image: redis:latest
-    container_name: redis-server
-    restart: always
+    image: redis:7-alpine
+    container_name: flood-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: [ "redis-server", "--appendonly", "yes", "--requirepass", "Nguyenluong1405" ]
+    command: [
+      "redis-server",
+      "--appendonly", "yes",
+      "--requirepass", "NguyenLuong1405",
+      "--maxmemory", "256mb",
+      "--maxmemory-policy", "allkeys-lru",
+      "--save", "900 1",
+      "--save", "300 10",
+      "--save", "60 10000"
+    ]
+    networks:
+      - flood-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  ingestion-service:
-    build:
-      context: .
-      dockerfile: ingestion-service/Dockerfile
-    container_name: flood-ingestion-service
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
+    container_name: flood-postgres
     restart: unless-stopped
     ports:
-      - "8082:8082"
+      - "5432:5432"
     environment:
-      SERVER_PORT: 8082
-      SPRING_APPLICATION_NAME: ingestion-service
-      MQTT_BROKER_URL: tcp://mqtt-broker:1883
-      MQTT_CLIENT_ID: ingestion-service
-      MQTT_TOPIC_PATTERN: floodguard/sensors/+/telemetry
-      MQTT_QOS: 1
-      MQTT_AUTO_RECONNECT: true
-      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
-      KAFKA_TOPIC: iot-raw
-      KAFKA_PRODUCER_KEY_SERIALIZER: org.apache.kafka.common.serialization.StringSerializer
-      KAFKA_PRODUCER_VALUE_SERIALIZER: org.apache.kafka.common.serialization.StringSerializer
-      KAFKA_PRODUCER_ACKS: all
-      KAFKA_PRODUCER_RETRIES: 3
-    depends_on:
-      - mqtt-broker
-      - kafka
+      POSTGRES_USER: floodalert
+      POSTGRES_PASSWORD: "@NguyenLuong1405"
+      POSTGRES_DB: flood_alert_db
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+      POSTGRES_SHARED_BUFFERS: 256MB
+      POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
+      POSTGRES_WORK_MEM: 8MB
+      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
+      POSTGRES_MAX_CONNECTIONS: 100
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/initdb:/docker-entrypoint-initdb.d
     networks:
-      - default
+      - flood-network
+    deploy:
+      resources:
+        limits:
+          memory: 768M
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U floodalert -d flood_alert_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
+  kafka_data:
+    driver: local
   redis_data:
-  kafka_data_new:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  flood-network:
+    driver: bridge
+    name: flood-network

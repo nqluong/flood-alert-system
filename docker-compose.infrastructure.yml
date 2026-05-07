@@ -54,7 +54,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      
+
       KAFKA_LOG_DIRS: /var/lib/kafka/data
       KAFKA_NUM_PARTITIONS: 3
       
@@ -144,6 +144,35 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  ingestion-service:
+    image: ${DOCKER_REGISTRY:-nqluong}/ingestion-service:${INGESTION_VERSION:-latest}
+    container_name: ingestion-service
+    restart: unless-stopped
+    ports:
+      - "${INGESTION_PORT:-8082}:8082"
+    env_file:
+      - ingestion-service/.env
+    depends_on:
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+      mqtt-broker:
+        condition: service_started
+    networks:
+      - flood-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
     logging:
       driver: "json-file"
       options:

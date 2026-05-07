@@ -13,7 +13,7 @@ public class CaffeineCacheConfig {
     @Bean
     public Cache<String, Boolean> sensorBlacklistCache() {
         return Caffeine.newBuilder()
-                .expireAfterWrite(60, TimeUnit.MINUTES)
+                .expireAfterWrite(60, TimeUnit.SECONDS)
                 .maximumSize(10_000)
                 .recordStats()
                 .build();

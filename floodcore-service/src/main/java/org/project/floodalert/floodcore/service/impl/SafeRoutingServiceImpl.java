@@ -87,10 +87,8 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
 
         log.info("[SafeRouting] Có {} điểm ngập nguy hiểm cần tránh", dangerousFloods.size());
 
-        // Tạo Polygon hình vuông bao quanh các điểm ngập
-        List<List<List<List<Double>>>> avoidPolygons = createAvoidPolygons(dangerousFloods);
+        List<List<List<Double>>> avoidPolygons = createAvoidPolygons(dangerousFloods);
 
-        // Gọi OpenRouteService với avoid_polygons
         String geoJson = callOrsWithAvoidance(request, avoidPolygons);
 
         return SafeRouteResponse.builder()
@@ -215,19 +213,50 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
 
     @SuppressWarnings("unchecked")
     private Map<Object, Object> convertBytesToStringMap(Object result) {
-        if (result instanceof Map) {
-            Map<byte[], byte[]> byteMap = (Map<byte[], byte[]>) result;
-            Map<Object, Object> stringMap = new HashMap<>();
+        if (result == null) {
+            return Collections.emptyMap();
+        }
+        
+        if (!(result instanceof Map)) {
+            return Collections.emptyMap();
+        }
+        
+        Map<?, ?> rawMap = (Map<?, ?>) result;
+        if (rawMap.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        
+        Map<Object, Object> stringMap = new HashMap<>();
+        
+        for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+            Object keyObj = entry.getKey();
+            Object valueObj = entry.getValue();
             
-            for (Map.Entry<byte[], byte[]> entry : byteMap.entrySet()) {
-                String key = new String(entry.getKey());
-                String value = entry.getValue() != null ? new String(entry.getValue()) : null;
-                stringMap.put(key, value);
+            String key;
+            String value;
+            
+            if (keyObj instanceof byte[]) {
+                key = new String((byte[]) keyObj);
+            } else if (keyObj instanceof String) {
+                key = (String) keyObj;
+            } else {
+                key = keyObj != null ? keyObj.toString() : null;
             }
             
-            return stringMap;
+            if (valueObj instanceof byte[]) {
+                value = new String((byte[]) valueObj);
+            } else if (valueObj instanceof String) {
+                value = (String) valueObj;
+            } else {
+                value = valueObj != null ? valueObj.toString() : null;
+            }
+            
+            if (key != null) {
+                stringMap.put(key, value);
+            }
         }
-        return Collections.emptyMap();
+        
+        return stringMap;
     }
 
     private FloodDetail mapToFloodDetail(Map<Object, Object> rawMap) {
@@ -278,32 +307,39 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
     /**
      * Tạo danh sách Polygon hình vuông bao quanh các điểm ngập.
      */
-    private List<List<List<List<Double>>>> createAvoidPolygons(List<FloodDetail> floods) {
-        List<List<List<List<Double>>>> multiPolygon = new ArrayList<>();
-
+    private List<List<List<Double>>> createAvoidPolygons(List<FloodDetail> floods) {
+        if (floods.size() == 1) {
+            List<List<Double>> squarePolygon = GeoUtils.createSquarePolygon(
+                    floods.get(0).getLat(),
+                    floods.get(0).getLon(),
+                    POLYGON_OFFSET
+            );
+            
+            List<List<List<Double>>> singlePolygon = new ArrayList<>();
+            singlePolygon.add(squarePolygon);
+            
+            log.debug("[SafeRouting] Đã tạo 1 avoid polygon (Polygon)");
+            return singlePolygon;
+        }
+        
+        List<List<List<Double>>> multiPolygon = new ArrayList<>();
         for (FloodDetail flood : floods) {
-            // Tạo hình vuông bao quanh điểm ngập
             List<List<Double>> squarePolygon = GeoUtils.createSquarePolygon(
                     flood.getLat(),
                     flood.getLon(),
                     POLYGON_OFFSET
             );
-
-            // Wrap vào một layer nữa để đúng chuẩn MultiPolygon
-            List<List<List<Double>>> polygon = new ArrayList<>();
-            polygon.add(squarePolygon);
-
-            multiPolygon.add(polygon);
+            multiPolygon.add(squarePolygon);
         }
-
-        log.debug("[SafeRouting] Đã tạo {} avoid polygons", multiPolygon.size());
+        
+        log.debug("[SafeRouting] Đã tạo {} avoid polygons (MultiPolygon)", floods.size());
         return multiPolygon;
     }
 
     /**
      * Gọi OpenRouteService API với avoid_polygons.
      */
-    private String callOrsWithAvoidance(SafeRouteRequest request, List<List<List<List<Double>>>> avoidPolygons) {
+    private String callOrsWithAvoidance(SafeRouteRequest request, List<List<List<Double>>> avoidPolygons) {
         try {
 
             OrsRequest.OrsOptions.OrsOptionsBuilder optionsBuilder = OrsRequest.OrsOptions.builder()
@@ -314,7 +350,7 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
             if (VehicleType.MOTORBIKE.equals(request.getVehicleType())) {
                 optionsBuilder.avoidFeatures(List.of("highways", "tollways"));
             }
-            // Tạo request body
+
             OrsRequest orsRequest = OrsRequest.builder()
                     .coordinates(List.of(
                             List.of(request.getStartLon(), request.getStartLat()),
@@ -323,7 +359,13 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
                     .options(optionsBuilder.build())
                     .build();
 
-            // Tạo headers
+            try {
+                String jsonPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(orsRequest);
+                log.info("[SafeRouting - Debug] JSON Payload với avoid_polygons:\n{}", jsonPayload);
+            } catch (Exception e) {
+                log.warn("[SafeRouting - Debug] Không thể in JSON Payload: {}", e.getMessage());
+            }
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("Authorization", orsProperties.getApiKey());
@@ -332,7 +374,6 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
 
             log.debug("[SafeRouting] Gọi ORS API: {}", orsProperties.getApiUrl());
 
-            // Gọi API
             ResponseEntity<String> response = restTemplate.exchange(
                     orsProperties.getApiUrl(),
                     HttpMethod.POST,
@@ -350,6 +391,10 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
 
         } catch (HttpClientErrorException.TooManyRequests e) {
             log.error("[SafeRouting] ORS API rate limit (429): {}", e.getMessage());
+            throw new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR);
+
+        } catch (HttpClientErrorException.BadRequest e) {
+            log.error("[SafeRouting] ORS API bad request (400): {}", e.getResponseBodyAsString());
             throw new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR);
 
         } catch (ResourceAccessException e) {

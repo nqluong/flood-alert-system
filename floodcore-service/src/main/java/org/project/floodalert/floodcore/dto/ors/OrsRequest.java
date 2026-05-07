@@ -49,12 +49,14 @@ public class OrsRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     @FieldDefaults(level = AccessLevel.PRIVATE)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public static class AvoidPolygons {
 
         @JsonProperty("type")
-        String type = "MultiPolygon";
+        @Builder.Default
+        String type = "Polygon";
 
         @JsonProperty("coordinates")
-        List<List<List<List<Double>>>> coordinates;
+        List<List<List<Double>>> coordinates;
     }
 }

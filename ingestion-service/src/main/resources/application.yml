@@ -10,20 +10,19 @@ spring:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
       password: ${REDIS_PASSWORD:}
-      database: 0
-      timeout: 5000
+      timeout: ${REDIS_TIMEOUT:5000}
       lettuce:
         pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
+          max-active: ${REDIS_POOL_MAX_ACTIVE:8}
+          max-idle: ${REDIS_POOL_MAX_IDLE:8}
+          min-idle: ${REDIS_POOL_MIN_IDLE:0}
+          max-wait: ${REDIS_POOL_MAX_WAIT:-1ms}
   config:
     import: classpath:key-redis.yml
 
 mqtt:
   borker-url: ${MQTT_BROKER_URL:tcp://localhost:1883}
-  client-id: ${MQTT_CLIENT_ID:ingention-service}-${random.uuid}
+  client-id: ${MQTT_CLIENT_ID:ingestion-service}-${random.uuid}
   topic-pattern: ${MQTT_TOPIC_PATTERN:floodguard/sensors/+/telemetry}
   qos: ${MQTT_QOS:1}
   auto-reconnect: ${MQTT_AUTO_RECONNECT:true}
@@ -33,11 +32,11 @@ kafka:
   topic: ${KAFKA_INGEST_TOPIC:iot-raw}
   producer:
     key-serializer: ${KAFKA_PRODUCER_KEY_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
-    value-serializer: ${KAFKA_PRODUCER_VALUE_SERIALIZER:org.apache.kafka.common.serialization.StringSerializer}
+    value-serializer: ${KAFKA_PRODUCER_VALUE_SERIALIZER:org.springframework.kafka.support.serializer.JsonSerializer}
     acks: ${KAFKA_PRODUCER_ACKS:all}
     retries: ${KAFKA_PRODUCER_RETRIES:3}
 
 logging:
   level:
-    org.apache.kafka: WARN
-    org.springframework.kafka: INFO
+    org.apache.kafka: ${LOGGING_LEVEL_KAFKA:WARN}
+    org.springframework.kafka: ${LOGGING_LEVEL_SPRING_KAFKA:INFO}

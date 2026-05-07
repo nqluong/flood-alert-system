@@ -10,8 +10,10 @@ COPY notification-service/pom.xml notification-service/
 COPY floodcore-service/pom.xml floodcore-service/
 COPY floodprocessor-service/pom.xml floodprocessor-service/
 COPY auth-service/pom.xml auth-service/
-
 COPY ingestion-service/pom.xml ingestion-service/
+
+RUN mvn dependency:go-offline -pl ingestion-service -am || true
+
 COPY ingestion-service/src ingestion-service/src
 
 RUN mvn clean package -pl ingestion-service -am -DskipTests
@@ -19,12 +21,17 @@ RUN mvn clean package -pl ingestion-service -am -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
+RUN apk add --no-cache wget
+RUN addgroup -S spring && adduser -S spring -G spring
 
-# Copy the built jar from the build stage
 COPY --from=build /app/ingestion-service/target/*.jar app.jar
-
-# Expose the port
+RUN chown -R spring:spring /app
+USER spring:spring
 EXPOSE 8082
 
-# Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8082/actuator/health || exit 1
+
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
+
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

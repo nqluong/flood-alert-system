@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  ingestion-service:
+    build:
+      context: ..
+      dockerfile: ingestion-service/Dockerfile
+    container_name: ingestion-service
+    ports:
+      - "${SERVER_PORT:-8082}:8082"
+    env_file:
+      - .env
+    networks:
+      - flood-alert-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 40s
+
+networks:
+  flood-alert-network:
+    name: flood-alert-network
