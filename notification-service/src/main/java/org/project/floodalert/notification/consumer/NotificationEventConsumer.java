@@ -236,8 +236,8 @@ public class NotificationEventConsumer {
         data.put("timestamp", event.getTimestamp().toString());
         
         data.put("isNearActive", context.isNearActive());
-        // Chỉ lưu tên địa chỉ, không có UUID
-        data.put("affectedZones", extractZoneNames(context.getAffectedZones()));
+        // zoneName đã sạch từ HASH, không cần extract
+        data.put("affectedZones", String.join(", ", context.getAffectedZones()));
         
         if (context.getActiveDistance() != null) {
             data.put("activeDistance", context.getActiveDistance());
@@ -247,25 +247,6 @@ public class NotificationEventConsumer {
         }
         
         return data;
-    }
-    
-    /**
-     * Trích xuất tên địa chỉ từ compound keys (loại bỏ UUID)
-     * Input: ["uuid1::Hồng Mai", "uuid2::Đống Đa"]
-     * Output: "Hồng Mai, Đống Đa"
-     */
-    private String extractZoneNames(List<String> affectedZones) {
-        return affectedZones.stream()
-                .map(zone -> {
-                    // Nếu có dấu ::, lấy phần sau
-                    int separatorIndex = zone.indexOf("::");
-                    if (separatorIndex != -1 && separatorIndex < zone.length() - 2) {
-                        return zone.substring(separatorIndex + 2);
-                    }
-                    // Nếu không có, trả về nguyên bản
-                    return zone;
-                })
-                .collect(Collectors.joining(", "));
     }
     
     /**

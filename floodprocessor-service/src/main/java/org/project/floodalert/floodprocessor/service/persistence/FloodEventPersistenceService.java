@@ -104,7 +104,7 @@ public class FloodEventPersistenceService {
                     .setScale(2, RoundingMode.HALF_UP);
             existingEvent.setConfidenceScore(newConfidenceScore);
 
-            // Kiểm tra chuyển từ PENDING → ACTIVE ===
+            // Kiểm tra chuyển từ PENDING sang ACTIVE
             if (STATUS_PENDING.equals(existingEvent.getStatus()) && newRecalculatedScore >= THRESHOLD_ACTIVE) {
                 existingEvent.setStatus(STATUS_ACTIVE);
                 existingEvent.setConfirmedAt(LocalDateTime.now(ZoneId.systemDefault()));
@@ -136,7 +136,6 @@ public class FloodEventPersistenceService {
             log.info("[PERSISTENCE] [CREATED NEW TRUST_SCORE] id={}, floodEventId={}, finalScore={} (lịch sử tiến hóa)",
                     savedTrustScore.getId(), savedTrustScore.getFloodEventId(), savedTrustScore.getFinalScore());
 
-            // AUTO-INSERT EventContributor: VERIFIER (người xác nhận thêm)
             // Chỉ insert nếu chưa tồn tại để tránh duplicate
             createContributor(updatedEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER);
 
@@ -210,14 +209,6 @@ public class FloodEventPersistenceService {
                 .build();
     }
 
-    /**
-     * Lấy trạng thái hiện tại của FloodEvent.
-     * Dùng cho smart routing để quyết định có cần chấm điểm lại hay không.
-     *
-     * @param eventId ID của FloodEvent
-     * @return Status: ACTIVE, PENDING, hoặc REJECTED
-     * @throws AppException nếu không tìm thấy event
-     */
     public String getEventStatus(String eventId) {
         FloodEvent event = floodEventRepository.findAll().stream()
                 .filter(e -> e.getEventId().equals(eventId))

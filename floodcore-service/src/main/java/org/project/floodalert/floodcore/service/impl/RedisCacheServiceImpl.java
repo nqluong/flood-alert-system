@@ -12,6 +12,7 @@ import org.springframework.data.redis.core.RedisCallback;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -233,6 +234,29 @@ public class RedisCacheServiceImpl implements CacheService {
                             value.getBytes()
                     );
                 });
+            });
+            return null;
+        });
+    }
+
+    /**
+     * Batch insert nhiều Hash keys với full key names
+     * Tối ưu hơn bằng cách sử dụng HMSET cho mỗi key
+     */
+    @Override
+    public void batchHSetFullKeys(Map<String, Map<String, String>> data) {
+        redisTemplate.executePipelined((RedisCallback<Object>) connection -> {
+            data.forEach((fullKey, fields) -> {
+                byte[] keyBytes = fullKey.getBytes();
+                
+                // Convert Map<String, String> to Map<byte[], byte[]>
+                Map<byte[], byte[]> byteFields = new HashMap<>();
+                fields.forEach((field, value) -> {
+                    byteFields.put(field.getBytes(), value.getBytes());
+                });
+                
+                // Sử dụng hMSet để set tất cả fields của một hash trong một command
+                connection.hashCommands().hMSet(keyBytes, byteFields);
             });
             return null;
         });

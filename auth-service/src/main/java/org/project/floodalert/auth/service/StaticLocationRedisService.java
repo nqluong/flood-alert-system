@@ -2,11 +2,7 @@ package org.project.floodalert.auth.service;
 
 import java.util.UUID;
 
-/**
- * Service quản lý static locations trong Redis Geo
- * Key: user:static_locations
- * Member format: {userId}::{zoneName}
- */
+
 public interface StaticLocationRedisService {
     
     /**

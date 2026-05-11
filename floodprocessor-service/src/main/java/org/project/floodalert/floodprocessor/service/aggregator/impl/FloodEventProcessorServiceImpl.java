@@ -15,7 +15,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Orchestrator của Module 5 (Event Aggregator).
  * Điều phối tuần tự 3 bước cho mỗi bản ghi sensor:
  * <ol>
  *   <li>Xử lý DB (kịch bản A/B/C) và back-link IoTReading</li>
@@ -44,12 +43,10 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
         }
 
         try {
-            // Bước 1 & 2: Xử lý DB (kịch bản A/B/C) + back-link IoTReading
+            // Xử lý DB (kịch bản A/B/C) + back-link IoTReading
             FloodEventDbResult dbResult = floodEventDbService.processAndSave(data);
 
             if (dbResult.floodEvent() == null) {
-                // Không có hành động (VD: status SAFE nhưng không có event active)
-                log.debug("Không có flood event nào được xử lý cho sensor [{}]", data.getSensorId());
                 return;
             }
 
@@ -85,33 +82,17 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
             log.debug("Batch rỗng, bỏ qua xử lý aggregator");
             return;
         }
-
-        log.info("Bắt đầu xử lý aggregator batch: {} bản ghi", dataList.size());
-
-        int successCount = 0;
-        int failCount = 0;
-
         for (ProcessedSensorData data : dataList) {
             try {
                 process(data);
-                successCount++;
             } catch (Exception e) {
-                failCount++;
                 log.error("Lỗi xử lý aggregator cho sensor [{}] trong batch: {}",
                         data != null ? data.getSensorId() : "null", e.getMessage());
             }
         }
 
-        log.info("Hoàn thành aggregator batch: {}/{} thành công, {} lỗi",
-                successCount, dataList.size(), failCount);
     }
 
-
-    /**
-     * Đồng bộ Redis Cache dựa trên trạng thái sensor mới nhất.
-     * - DANGER/WARNING (kịch bản B hoặc C): thêm/cập nhật vào GEO set và Hash.
-     * - SAFE (kịch bản A): xóa khỏi GEO set và Hash.
-     */
 //    private void syncRedisCache(FloodStatus newStatus, FloodEvent floodEvent) {
 //        if (newStatus == FloodStatus.SAFE) {
 //            // Kịch bản A – Nước rút: xóa khỏi cache

@@ -24,10 +24,8 @@ public class SensorHealthThrottlingService {
     @Value("${app.sensor-health.sync-interval-ms:300000}")
     private long syncIntervalMs;
 
-    /** Cache in-memory: sensorId thời điểm đồng bộ cuối (Unix ms) */
     private final ConcurrentHashMap<String, Long> lastSyncTimeMap = new ConcurrentHashMap<>();
 
-    /** Cache in-memory: sensorId trạng thái lần đồng bộ cuối */
     private final ConcurrentHashMap<String, String> lastStatusMap = new ConcurrentHashMap<>();
 
 

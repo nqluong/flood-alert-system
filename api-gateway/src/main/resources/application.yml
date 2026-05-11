@@ -47,7 +47,7 @@ spring:
               /flood-alert/api/v1/admin/floods/**,
               /flood-alert/api/v1/core/floods/**,
               /flood-alert/api/v1/core/routes/**,
-              /flood-alert/api/v1/reports/**,
+              /flood-alert/api/v1/reports/**
           filters:
             - StripPrefix=1
 

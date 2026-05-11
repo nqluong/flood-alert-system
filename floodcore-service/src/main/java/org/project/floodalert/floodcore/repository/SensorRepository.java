@@ -45,4 +45,12 @@ public interface SensorRepository extends JpaRepository<Sensor, UUID> {
 
     // Lấy sensors theo danh sách IDs
     List<Sensor> findByIdIn(List<UUID> ids);
+
+    // Virtual sensor queries
+    long countByIsVirtual(Boolean isVirtual);
+    
+    List<Sensor> findByIsVirtual(Boolean isVirtual);
+    
+    @Query("SELECT s.sensorId FROM Sensor s WHERE s.isVirtual = true ORDER BY s.sensorId DESC")
+    List<String> findAllVirtualSensorIds();
 }

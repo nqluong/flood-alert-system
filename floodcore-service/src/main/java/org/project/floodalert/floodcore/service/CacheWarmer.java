@@ -21,10 +21,10 @@ import java.util.concurrent.CompletableFuture;
 @RequiredArgsConstructor
 public class CacheWarmer implements ApplicationRunner {
 
-    private final SensorRepository          sensorRepository;
-    private final SensorSyncService         sensorSyncService;
+    private final SensorRepository sensorRepository;
+    private final SensorSyncService sensorSyncService;
     private final CoreActiveFloodRepository coreActiveFloodRepository;
-    private final FloodGeoCache             floodGeoCache;
+    private final FloodGeoCache floodGeoCache;
 
     @Override
     public void run(ApplicationArguments args) {
@@ -33,7 +33,7 @@ public class CacheWarmer implements ApplicationRunner {
                 .runAsync(this::warmSensorCache)
                 .exceptionally(ex -> {
                     log.error("[CacheWarmer] Sensor warm-up thất bại: {}", ex.getMessage(), ex);
-                    return null; // tiếp tục – không chặn flood task
+                    return null;
                 });
 
         CompletableFuture<Void> floodTask = CompletableFuture

@@ -22,12 +22,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
-/**
- * KHỐI 2: Dispatcher Worker
- * <p>
- * Scheduled job chạy mỗi 2 giây, lấy 500 notifications PENDING,
- * gửi qua Firebase FCM với parallel processing sử dụng Virtual Threads.
- */
 @Slf4j
 @Component
 public class FcmDispatchWorker {
@@ -61,7 +55,6 @@ public class FcmDispatchWorker {
         try {
             long startTime = System.currentTimeMillis();
 
-            // Tìm tối đa 500 notifications đang PENDING
             List<Notification> pendingNotifications = notificationRepository
                     .findTopByStatusOrderByCreatedAtAsc(NotificationStatus.PENDING, BATCH_SIZE);
 
@@ -155,52 +148,6 @@ public class FcmDispatchWorker {
 
         return validNotifications;
     }
-
-    private String fetchFcmTokenForUser(String userId) {
-        String redisKey = REDIS_FCM_TOKEN_PREFIX + userId;
-
-        try {
-            Object cachedToken = redisTemplate.opsForValue().get(redisKey);
-
-            if (cachedToken != null) {
-                String token = cachedToken.toString();
-                if (!token.isBlank()) {
-                    log.debug("Cache HIT - FCM token cho user {}", userId);
-                    return token;
-                }
-            }
-
-            log.debug("Redis trả về null. Xác định user {} không có token.", userId);
-            return null;
-
-        } catch (Exception redisException) {
-            log.warn("[CIRCUIT BREAKER] Lỗi kết nối Redis khi lấy token user {}. Chuyển hướng truy vấn xuống Database. Chi tiết: {}",
-                    userId, redisException.getMessage());
-
-            try {
-                // Fallback: Query từ Database
-                UUID userUuid = UUID.fromString(userId);
-                return preferenceRepository.findById(userUuid)
-                        .map(pref -> {
-                            String dbToken = pref.getFcmToken();
-                            if (dbToken != null && !dbToken.isBlank()) {
-                                log.debug("Fallback DB HIT - Lấy được token cho user {}", userId);
-                                return dbToken;
-                            }
-                            return null;
-                        })
-                        .orElse(null);
-
-            } catch (IllegalArgumentException e) {
-                log.warn("Invalid UUID format cho userId: {}", userId);
-                return null;
-            } catch (Exception dbException) {
-                log.error("Lỗi thảm họa: Cả Redis và DB đều thất bại cho user {}: {}", userId, dbException.getMessage());
-                return null;
-            }
-        }
-    }
-
 
     private void sendToFirebaseParallel(List<Notification> notifications) {
         log.info("Sending {} notifications to Firebase với sub-batch parallel processing",

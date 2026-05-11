@@ -51,9 +51,6 @@ public class UserReportProcessorServiceImpl implements UserReportProcessorServic
     @Transactional
     public void cleanupPendingReports() {
         LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(pendingTimeoutMinutes);
-        log.info("Bắt đầu dọn dẹp báo cáo PENDING cũ hơn {} phút (cutoff: {})", 
-                pendingTimeoutMinutes, cutoffTime);
-
         int totalRejected = 0;
         int pageNumber = 0;
         Page<FloodEvent> page;
@@ -83,8 +80,6 @@ public class UserReportProcessorServiceImpl implements UserReportProcessorServic
     @Transactional
     public void applyTimeDecayAndSpatialCheck() {
         LocalDateTime decayCutoffTime = LocalDateTime.now().minusMinutes(decayIntervalMinutes);
-        log.info("Bắt đầu áp dụng cơ chế lão hóa cho báo cáo ACTIVE không cập nhật từ {} phút trước (cutoff: {})", 
-                decayIntervalMinutes, decayCutoffTime);
 
         int totalDecayed = 0;
         int totalKeptBySensor = 0;

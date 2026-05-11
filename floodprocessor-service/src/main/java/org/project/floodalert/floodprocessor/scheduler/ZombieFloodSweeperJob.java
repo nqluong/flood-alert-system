@@ -40,7 +40,7 @@ public class ZombieFloodSweeperJob {
                 event.setStatus("EXPIRED");
                 floodEventRepository.save(event);
 
-                log.info("Sự kiện ngập ID {} đã được đóng do sensor {} không gửi tín hiệu trong {} ms.",
+                log.debug("Sự kiện ngập ID {} đã được đóng do sensor {} không gửi tín hiệu trong {} ms.",
                         event.getId(), sensorId, timeout);
 
                 // Publish lifecycle event to Kafka

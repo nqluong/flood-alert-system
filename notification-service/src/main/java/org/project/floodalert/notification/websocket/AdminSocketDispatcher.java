@@ -17,10 +17,8 @@ public class AdminSocketDispatcher {
 
     private final SimpMessagingTemplate simpMessagingTemplate;
 
-    /** Channel WebSocket nhận dữ liệu đo đạc liên tục từ cảm biến */
     private static final String TOPIC_TELEMETRY = "/topic/admin/map/telemetry";
 
-    /** Channel WebSocket nhận sự kiện vòng đời cảnh báo ngập lụt */
     private static final String TOPIC_ALERTS = "/topic/admin/alerts";
 
     @KafkaListener(
@@ -41,7 +39,6 @@ public class AdminSocketDispatcher {
                     .timestamp(data.getTimestamp())
                     .locationName(data.getLocationName())
                     .build();
-            // Đẩy thẳng dữ liệu telemetry xuống client đang subscribe /topic/admin/map/telemetry
             simpMessagingTemplate.convertAndSend(TOPIC_TELEMETRY, slimDto);
 
 

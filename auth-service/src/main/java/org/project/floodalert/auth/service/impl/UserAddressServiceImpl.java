@@ -144,7 +144,6 @@ public class UserAddressServiceImpl implements UserAddressService {
                 ));
         userAddressRepository.delete(userAddress);
         
-        // Xóa khỏi Redis Geo
         staticLocationRedisService.removeLocation(userAddress.getUserId(), addressId);
         log.info("Admin đã xóa địa chỉ và cập nhật Redis: userId={}, addressId={}", 
                 userAddress.getUserId(), addressId);
@@ -177,11 +176,8 @@ public class UserAddressServiceImpl implements UserAddressService {
                 .build();
     }
 
-    /**
-     * Xác định zone name từ address để lưu vào Redis
-     */
+
     private String determineZoneName(UserAddress address) {
-        // Ưu tiên addressText, fallback sang addressType
         if (address.getAddressText() != null && !address.getAddressText().isBlank()) {
             String text = address.getAddressText().trim();
             return text.length() > 50 ? text.substring(0, 50) : text;

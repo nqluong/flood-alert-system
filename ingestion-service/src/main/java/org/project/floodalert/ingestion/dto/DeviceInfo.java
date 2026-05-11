@@ -23,4 +23,7 @@ public class DeviceInfo {
 
     @JsonProperty("message_id")
     String messageId;
+
+    @JsonProperty("api_key")
+    String apiKey;
 }

@@ -1,6 +1,5 @@
 package org.project.floodalert.notification.service;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.notification.dto.event.FloodEventDTO;
 import org.project.floodalert.notification.model.NotificationContext;
@@ -18,15 +17,32 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class NotificationAggregationService {
     
-    @Qualifier("geoRedisTemplate")
     private final RedisTemplate<String, String> geoRedisTemplate;
+    private final RedisTemplate<String, Object> redisTemplate;
+    
+    private GeoOperations<String, String> geoOps;
+    
+    public NotificationAggregationService(
+            @Qualifier("geoRedisTemplate") RedisTemplate<String, String> geoRedisTemplate,
+            RedisTemplate<String, Object> redisTemplate) {
+        this.geoRedisTemplate = geoRedisTemplate;
+        this.redisTemplate = redisTemplate;
+    }
     
     private static final String ACTIVE_LOCATIONS_KEY = "user:active_locations";
-    private static final String STATIC_LOCATIONS_KEY = "user:static_locations";
-    private static final String COMPOUND_KEY_SEPARATOR = "::";
+    private static final String GEO_STATIC_LOCATIONS_KEY = "user_locations:static";
+    private static final String ADDRESS_DETAILS_PREFIX = "address_details:";
+    private static final String USER_HEARTBEAT_PREFIX = "user:heartbeat:";
+    private static final long USER_HEARTBEAT_TTL_SECONDS = 300L; // 5 phút
+    
+    private GeoOperations<String, String> getGeoOps() {
+        if (geoOps == null) {
+            geoOps = geoRedisTemplate.opsForGeo();
+        }
+        return geoOps;
+    }
 
     public Map<UUID, NotificationContext> aggregateNotificationContexts(FloodEventDTO event) {
         log.info("Bắt đầu quét Redis Geo cho event: eventId={}, location=({}, {}), radius={}m",
@@ -66,12 +82,11 @@ public class NotificationAggregationService {
         try {
             log.debug("Quét ACTIVE locations...");
             
-            GeoOperations<String, String> geoOps = geoRedisTemplate.opsForGeo();
             Point center = new Point(event.getLon(), event.getLat());
             Distance radius = new Distance(event.getRadiusMeters() / 1000.0, Metrics.KILOMETERS);
             Circle area = new Circle(center, radius);
             
-            GeoResults<RedisGeoCommands.GeoLocation<String>> results = geoOps.radius(
+            GeoResults<RedisGeoCommands.GeoLocation<String>> results = getGeoOps().radius(
                     ACTIVE_LOCATIONS_KEY,
                     area,
                     RedisGeoCommands.GeoRadiusCommandArgs
@@ -85,13 +100,39 @@ public class NotificationAggregationService {
                 return Collections.emptyMap();
             }
             
-            Map<UUID, NotificationContext> contexts = new ConcurrentHashMap<>();
+            log.debug("Tìm thấy {} active locations, đang kiểm tra heartbeat...", results.getContent().size());
             
+            Map<UUID, Double> userDistances = new HashMap<>();
             for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : results.getContent()) {
                 try {
                     String memberStr = result.getContent().getName();
                     UUID userId = UUID.fromString(memberStr);
                     Double distanceMeters = result.getDistance().getValue() * 1000;
+                    userDistances.put(userId, distanceMeters);
+                } catch (IllegalArgumentException e) {
+                    log.warn("Invalid userId format: {}", result.getContent().getName());
+                }
+            }
+            
+            if (userDistances.isEmpty()) {
+                return Collections.emptyMap();
+            }
+            
+            List<String> heartbeatKeys = userDistances.keySet().stream()
+                    .map(userId -> USER_HEARTBEAT_PREFIX + userId)
+                    .collect(Collectors.toList());
+            
+            List<Object> heartbeatResults = redisTemplate.opsForValue().multiGet(heartbeatKeys);
+            
+            Map<UUID, NotificationContext> contexts = new ConcurrentHashMap<>();
+            int index = 0;
+            for (UUID userId : userDistances.keySet()) {
+                Object heartbeat = heartbeatResults != null && index < heartbeatResults.size() 
+                        ? heartbeatResults.get(index) 
+                        : null;
+                
+                if (heartbeat != null) {
+                    Double distanceMeters = userDistances.get(userId);
                     
                     NotificationContext context = NotificationContext.builder()
                             .userId(userId)
@@ -100,14 +141,13 @@ public class NotificationAggregationService {
                             .build();
                     
                     contexts.put(userId, context);
-                    
-                } catch (IllegalArgumentException e) {
-                    log.warn("Invalid userId format in active locations: {}", 
-                            result.getContent().getName());
+                } else {
+                    log.debug("User {} không có heartbeat hợp lệ, bỏ qua", userId);
                 }
+                
+                index++;
             }
             
-            log.debug("Tìm thấy {} active users", contexts.size());
             return contexts;
             
         } catch (Exception e) {
@@ -118,19 +158,20 @@ public class NotificationAggregationService {
     
     /**
      * Quét static locations (địa điểm cố định của user)
-     * Member format: {userId}::{addressId}::{zoneName}
+     * GEO quét addressId
+     * HASH lấy chi tiết (userId, zoneName)
      */
     private Map<UUID, NotificationContext> scanStaticLocations(FloodEventDTO event) {
         try {
             log.debug("Quét STATIC locations...");
             
-            GeoOperations<String, String> geoOps = geoRedisTemplate.opsForGeo();
+            // Quét GEO để lấy danh sách addressId
             Point center = new Point(event.getLon(), event.getLat());
             Distance radius = new Distance(event.getRadiusMeters() / 1000.0, Metrics.KILOMETERS);
             Circle area = new Circle(center, radius);
             
-            GeoResults<RedisGeoCommands.GeoLocation<String>> results = geoOps.radius(
-                    STATIC_LOCATIONS_KEY,
+            GeoResults<RedisGeoCommands.GeoLocation<String>> results = getGeoOps().radius(
+                    GEO_STATIC_LOCATIONS_KEY,
                     area,
                     RedisGeoCommands.GeoRadiusCommandArgs
                             .newGeoRadiusArgs()
@@ -143,26 +184,35 @@ public class NotificationAggregationService {
                 return Collections.emptyMap();
             }
             
+            log.debug("Tìm thấy {} địa chỉ trong vùng ngập", results.getContent().size());
+            
+            // Lấy chi tiết từ HASH và gộp theo userId
             Map<UUID, NotificationContext> contexts = new ConcurrentHashMap<>();
             
             for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : results.getContent()) {
                 try {
-                    String compoundKey = result.getContent().getName();
+                    String addressId = result.getContent().getName();
                     Double distanceMeters = result.getDistance().getValue() * 1000;
                     
-                    // Parse compound key: {userId}::{addressId}::{zoneName}
-                    String[] parts = compoundKey.split(COMPOUND_KEY_SEPARATOR);
+                    // Lấy chi tiết từ HASH
+                    String hashKey = ADDRESS_DETAILS_PREFIX + addressId;
+                    Map<Object, Object> details = redisTemplate.opsForHash().entries(hashKey);
                     
-                    if (parts.length < 3) {
-                        log.warn("Invalid compound key format (expected userId::addressId::zoneName): {}", compoundKey);
+                    if (details.isEmpty()) {
+                        log.warn("Không tìm thấy chi tiết cho addressId={}", addressId);
                         continue;
                     }
                     
-                    UUID userId = UUID.fromString(parts[0]);
-                    // parts[1] là addressId, bỏ qua vì không cần
-                    String zoneName = parts[2];
+                    String userIdStr = (String) details.get("userId");
+                    String zoneName = (String) details.get("zoneName");
                     
-                    // Gộp vào context (có thể đã có từ active)
+                    if (userIdStr == null || zoneName == null) {
+                        log.warn("Thiếu thông tin trong HASH: addressId={}", addressId);
+                        continue;
+                    }
+                    
+                    UUID userId = UUID.fromString(userIdStr);
+                    
                     contexts.compute(userId, (key, existingContext) -> {
                         if (existingContext == null) {
                             return NotificationContext.builder()
@@ -181,7 +231,7 @@ public class NotificationAggregationService {
                     });
                     
                 } catch (IllegalArgumentException e) {
-                    log.warn("Lỗi parse compound key: {}", result.getContent().getName(), e);
+                    log.warn("Lỗi parse addressId hoặc userId: {}", result.getContent().getName(), e);
                 }
             }
             
@@ -200,16 +250,12 @@ public class NotificationAggregationService {
         
         Map<UUID, NotificationContext> merged = new ConcurrentHashMap<>(activeResults);
         
-        staticResults.forEach((userId, staticContext) -> {
-            merged.merge(userId, staticContext, (existing, incoming) -> {
-                // Merge thông tin từ static vào existing (từ active)
-                existing.getAffectedZones().addAll(incoming.getAffectedZones());
-                existing.setStaticDistance(incoming.getStaticDistance());
-                return existing;
-            });
-        });
+        staticResults.forEach((userId, staticContext) -> merged.merge(userId, staticContext, (existing, incoming) -> {
+            existing.getAffectedZones().addAll(incoming.getAffectedZones());
+            existing.setStaticDistance(incoming.getStaticDistance());
+            return existing;
+        }));
         
-        // Log chi tiết
         long bothAffected = merged.values().stream().filter(NotificationContext::isBothAffected).count();
         long onlyActive = merged.values().stream()
                 .filter(ctx -> ctx.isNearActive() && ctx.getAffectedZones().isEmpty()).count();
@@ -221,53 +267,28 @@ public class NotificationAggregationService {
         
         return merged;
     }
-    
-    /**
-     * Sinh nội dung thông báo dựa trên context
-     */
+
     public String generateNotificationBody(NotificationContext context, FloodEventDTO event) {
         String severityVi = translateSeverityToVietnamese(event.getSeverityLevel());
         
         if (context.isBothAffected()) {
-            // Dính cả 2
-            String zones = extractZoneNames(context.getAffectedZones());
+            String zones = String.join(", ", context.getAffectedZones());
             return String.format(
                     "Khu vực bạn đang di chuyển VÀ gần %s đang có ngập lụt (mức độ: %s). Hãy chú ý an toàn!",
                     zones, severityVi
             );
         } else if (context.isNearActive()) {
-            // Chỉ dính active
             return String.format(
                     "Có điểm ngập lụt cách vị trí hiện tại của bạn khoảng %.0fm (mức độ: %s). Chú ý hướng di chuyển!",
                     context.getActiveDistance(), severityVi
             );
         } else {
-            // Chỉ dính static
-            String zones = extractZoneNames(context.getAffectedZones());
+            String zones = String.join(", ", context.getAffectedZones());
             return String.format(
                     "Cảnh báo: Khu vực quanh %s của bạn vừa xuất hiện điểm ngập (mức độ: %s).",
                     zones, severityVi
             );
         }
-    }
-    
-    /**
-     * Trích xuất tên địa chỉ từ compound keys (loại bỏ UUID)
-     * Input: ["uuid1::Hồng Mai", "uuid2::Đống Đa"]
-     * Output: "Hồng Mai, Đống Đa"
-     */
-    private String extractZoneNames(List<String> affectedZones) {
-        return affectedZones.stream()
-                .map(zone -> {
-                    // Nếu có dấu ::, lấy phần sau
-                    int separatorIndex = zone.indexOf(COMPOUND_KEY_SEPARATOR);
-                    if (separatorIndex != -1 && separatorIndex < zone.length() - 2) {
-                        return zone.substring(separatorIndex + 2);
-                    }
-                    // Nếu không có, trả về nguyên bản
-                    return zone;
-                })
-                .collect(Collectors.joining(", "));
     }
     
     /**
@@ -283,7 +304,7 @@ public class NotificationAggregationService {
             case "DANGER", "HIGH" -> "Nguy hiểm";
             case "WARNING", "MEDIUM" -> "Cảnh báo";
             case "LOW" -> "Thấp";
-            default -> severityLevel; // Giữ nguyên nếu không match
+            default -> severityLevel;
         };
     }
 

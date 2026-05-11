@@ -1,6 +1,5 @@
 package org.project.floodalert.notification.worker;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.notification.enums.NotificationStatus;
 import org.project.floodalert.notification.model.Notification;
@@ -19,12 +18,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.stream.Collectors;
 
-/**
- * Retry CronJob
- * <p>
- * Scheduled job chạy mỗi phút, tìm các notifications FAILED đến hạn retry,
- * và reset status về PENDING để FcmDispatchWorker xử lý lại.
- */
 @Slf4j
 @Component
 public class NotificationRetryWorker {

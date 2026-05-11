@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
+import java.time.Instant;
+
 
 @Data
 @Builder
@@ -29,5 +31,5 @@ public class SensorDataDTO {
     Health health;
 
     @JsonProperty("timestamp")
-    Long timestamp;
+    Instant timestamp;
 }

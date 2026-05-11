@@ -47,6 +47,14 @@ public interface CacheService {
     List<Object> executePipeline(RedisCallback<Object> callback);
     void batchHSet(String keyPrefix, Map<String, Map<String, String>> data);
     void batchDelete(List<String> keys);
+    
+    /**
+     * Batch insert nhiều Hash keys với full key names (không cần prefix)
+     * Tối ưu cho việc insert hàng loạt sensors vào Redis
+     * 
+     * @param data Map<fullKeyName, Map<field, value>>
+     */
+    void batchHSetFullKeys(Map<String, Map<String, String>> data);
 
     // Utility
     Set<String> keys(String pattern);

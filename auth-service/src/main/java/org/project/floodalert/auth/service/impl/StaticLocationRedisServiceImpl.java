@@ -10,7 +10,10 @@ import org.springframework.data.redis.core.GeoOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Slf4j
@@ -21,90 +24,94 @@ public class StaticLocationRedisServiceImpl implements StaticLocationRedisServic
     private final RedisTemplate<String, Object> redisTemplate;
     private final UserAddressRepository userAddressRepository;
     
-    private static final String STATIC_LOCATIONS_KEY = "user:static_locations";
-    private static final String MEMBER_SEPARATOR = "::";
+    private static final String GEO_LOCATIONS_KEY = "user_locations:static";
+    
+    private static final String ADDRESS_DETAILS_PREFIX = "address_details:";
     
     @Override
     public void addOrUpdateLocation(UUID userId, UUID addressId, String zoneName, Double lat, Double lon) {
         try {
-            String member = buildMember(userId, addressId, zoneName);
             Point point = new Point(lon, lat);
-            
             GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
+            geoOps.add(GEO_LOCATIONS_KEY, point, addressId.toString());
             
-            Long added = geoOps.add(STATIC_LOCATIONS_KEY, point, member);
+            String hashKey = ADDRESS_DETAILS_PREFIX + addressId;
+            Map<String, String> addressDetails = new HashMap<>();
+            addressDetails.put("userId", userId.toString());
+            addressDetails.put("zoneName", zoneName);
+            addressDetails.put("lat", lat.toString());
+            addressDetails.put("lon", lon.toString());
             
-            if (added != null && added > 0) {
-                log.info("Đã thêm static location vào Redis: user={}, addressId={}, zone={}, location=({}, {})",
-                        userId, addressId, zoneName, lat, lon);
-            } else {
-                log.info("Đã cập nhật static location trong Redis: user={}, addressId={}, zone={}, location=({}, {})",
-                        userId, addressId, zoneName, lat, lon);
-            }
+            redisTemplate.opsForHash().putAll(hashKey, addressDetails);
+
             
         } catch (Exception e) {
-            log.error("Lỗi khi thêm/cập nhật static location vào Redis: user={}, addressId={}", 
-                    userId, addressId, e);
+            log.error("Lỗi khi thêm/cập nhật static location: addressId={}", addressId, e);
         }
     }
     
     @Override
     public void removeLocation(UUID userId, UUID addressId) {
         try {
-            String pattern = userId.toString() + "::" + addressId.toString() + "::*";
-            
             GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
+            geoOps.remove(GEO_LOCATIONS_KEY, addressId.toString());
             
-            // Vì Redis Geo không hỗ trợ pattern matching trực tiếp,
-            // ta phải dùng workaround: xóa bằng member name chính xác
-            // Giả sử ta lưu addressId trong member để có thể xóa
-            
-            // Tạm thời xóa bằng cách scan all members (không hiệu quả cho production)
-            // TODO: Cải thiện bằng cách lưu mapping addressId -> member trong Redis Hash
-            
-            List<Object> allMembers = getAllMembersForUser(userId);
-            for (Object member : allMembers) {
-                String memberStr = member.toString();
-                if (memberStr.contains("::" + addressId.toString() + "::")) {
-                    Long removed = geoOps.remove(STATIC_LOCATIONS_KEY, member);
-                    if (removed != null && removed > 0) {
-                        log.info("Đã xóa static location khỏi Redis: user={}, addressId={}, member={}",
-                                userId, addressId, memberStr);
-                    }
-                }
-            }
-            
+            String hashKey = ADDRESS_DETAILS_PREFIX + addressId.toString();
+            redisTemplate.delete(hashKey);
+
         } catch (Exception e) {
-            log.error("Lỗi khi xóa static location khỏi Redis: user={}, addressId={}", 
-                    userId, addressId, e);
+            log.error("Lỗi khi xóa static location: addressId={}", addressId, e);
         }
     }
     
     @Override
     public void removeAllUserLocations(UUID userId) {
         try {
-            List<Object> members = getAllMembersForUser(userId);
+            Set<String> keys = redisTemplate.keys(ADDRESS_DETAILS_PREFIX + "*");
             
-            if (!members.isEmpty()) {
-                GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
-                Long removed = geoOps.remove(STATIC_LOCATIONS_KEY, members.toArray());
-                
-                log.info("Đã xóa {} static locations của user {} khỏi Redis", removed, userId);
+            if (keys == null || keys.isEmpty()) {
+                log.info("Không có location nào của user {}", userId);
+                return;
             }
             
+            int removedCount = 0;
+            GeoOperations<String, Object> geoOps = redisTemplate.opsForGeo();
+            
+            for (String hashKey : keys) {
+                Map<Object, Object> details = redisTemplate.opsForHash().entries(hashKey);
+                String storedUserId = (String) details.get("userId");
+                
+                if (userId.toString().equals(storedUserId)) {
+                    String addressId = hashKey.replace(ADDRESS_DETAILS_PREFIX, "");
+                    
+                    geoOps.remove(GEO_LOCATIONS_KEY, addressId);
+                    
+                    redisTemplate.delete(hashKey);
+                    
+                    removedCount++;
+                }
+            }
+            
+            log.info("Đã xóa {} static locations của user {}", removedCount, userId);
+            
         } catch (Exception e) {
-            log.error("Lỗi khi xóa tất cả static locations của user {} khỏi Redis", userId, e);
+            log.error("Lỗi khi xóa tất cả static locations của user {}", userId, e);
         }
     }
     
     @Override
     public long syncAllAddressesToRedis() {
         try {
-            log.info("Bắt đầu sync tất cả địa chỉ từ database lên Redis...");
+            log.info("========== BẮT ĐẦU SYNC ĐỊA CHỈ LÊN REDIS ==========");
             
-            // Xóa toàn bộ key cũ
-            redisTemplate.delete(STATIC_LOCATIONS_KEY);
-            // Load tất cả địa chỉ từ database
+            redisTemplate.delete(GEO_LOCATIONS_KEY);
+            
+            Set<String> oldHashKeys = redisTemplate.keys(ADDRESS_DETAILS_PREFIX + "*");
+            if (oldHashKeys != null && !oldHashKeys.isEmpty()) {
+                redisTemplate.delete(oldHashKeys);
+                log.info("Đã xóa {} HASH keys cũ", oldHashKeys.size());
+            }
+            
             List<UserAddress> allAddresses = userAddressRepository.findAll();
             log.info("Tìm thấy {} địa chỉ trong database", allAddresses.size());
             
@@ -114,31 +121,35 @@ public class StaticLocationRedisServiceImpl implements StaticLocationRedisServic
             for (UserAddress address : allAddresses) {
                 try {
                     String zoneName = determineZoneName(address);
-                    String member = buildMember(address.getUserId(), address.getId(), zoneName);
+                    
                     Point point = new Point(
                             address.getLon().doubleValue(), 
                             address.getLat().doubleValue()
                     );
+                    geoOps.add(GEO_LOCATIONS_KEY, point, address.getId().toString());
                     
-                    geoOps.add(STATIC_LOCATIONS_KEY, point, member);
-                    syncCount++;
+                    String hashKey = ADDRESS_DETAILS_PREFIX + address.getId().toString();
+                    Map<String, String> addressDetails = new HashMap<>();
+                    addressDetails.put("userId", address.getUserId().toString());
+                    addressDetails.put("zoneName", zoneName);
+                    addressDetails.put("lat", address.getLat().toString());
+                    addressDetails.put("lon", address.getLon().toString());
                     
+                    redisTemplate.opsForHash().putAll(hashKey, addressDetails);
+
                 } catch (Exception e) {
                     log.warn("Lỗi khi sync địa chỉ id={}: {}", address.getId(), e.getMessage());
                 }
             }
             
+            log.info("========== HOÀN TẤT SYNC ĐỊA CHỈ ==========");
+            log.info("Đã sync {} địa chỉ lên Redis", syncCount);
             return syncCount;
             
         } catch (Exception e) {
             log.error("Lỗi khi sync tất cả địa chỉ lên Redis", e);
             return 0;
         }
-    }
-    
-
-    private String buildMember(UUID userId, UUID addressId, String zoneName) {
-        return userId.toString() + MEMBER_SEPARATOR + addressId.toString() + MEMBER_SEPARATOR + zoneName;
     }
 
     private String determineZoneName(UserAddress address) {
@@ -162,7 +173,7 @@ public class StaticLocationRedisServiceImpl implements StaticLocationRedisServic
             return text;
         }
 
-        return "Địa điểm ";
+        return "Địa điểm";
     }
     
     /**
@@ -179,19 +190,5 @@ public class StaticLocationRedisServiceImpl implements StaticLocationRedisServic
             case "OTHER" -> "Khác";
             default -> addressType;
         };
-    }
-    
-    /**
-     * Lấy tất cả members của một user
-     * Workaround vì Redis Geo không hỗ trợ pattern matching
-     */
-    private List<Object> getAllMembersForUser(UUID userId) {
-        // TODO: Implement efficient way to get user's members
-        // Có thể dùng Redis Hash để lưu mapping: user:{userId}:addresses -> Set<member>
-        // Hoặc scan toàn bộ members (không hiệu quả)
-        
-        // Tạm thời return empty list, cần implement sau
-        log.warn("getAllMembersForUser chưa được implement hiệu quả, cần cải thiện");
-        return List.of();
     }
 }

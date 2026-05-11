@@ -10,10 +10,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 
-/**
- * Kafka Consumer lắng nghe sensor data từ IoT devices
- * Nhận batch messages và delegate cho SensorDataBatchProcessor xử lý
- */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

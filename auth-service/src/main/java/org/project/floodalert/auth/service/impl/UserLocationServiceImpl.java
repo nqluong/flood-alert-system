@@ -24,7 +24,6 @@ public class UserLocationServiceImpl implements UserLocationService {
         log.debug("Updating location for user: {} at ({}, {})", userId, latitude, longitude);
 
         try {
-            // Convert coordinates to Spring Data Geo Point
             Point location = new Point(longitude, latitude);
             String userIdStr = userId.toString();
             String heartbeatKey = RedisKeyConstants.getUserHeartbeatKey(userId);

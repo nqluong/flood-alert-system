@@ -78,6 +78,9 @@ public class Sensor {
     @Column(name = "created_by")
     UUID createdBy;
 
+    @Column(name = "is_virtual")
+    Boolean isVirtual;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

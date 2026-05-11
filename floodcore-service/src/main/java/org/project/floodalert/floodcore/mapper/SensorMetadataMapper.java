@@ -17,6 +17,7 @@ public class SensorMetadataMapper {
         metadata.put("status", getOrDefault(sensor.getStatus(), "UNKNOWN"));
         metadata.put("name", getOrDefault(sensor.getName(), ""));
         metadata.put("location_name", getOrDefault(sensor.getLocationName(), ""));
+        metadata.put("api_key", getOrDefault(sensor.getApiKey(), ""));
 
         // Thông tin phần cứng
         metadata.put("hardware_model", getOrDefault(sensor.getHardwareModel(), ""));

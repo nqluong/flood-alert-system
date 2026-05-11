@@ -49,9 +49,6 @@ public class DispatcherServiceImpl implements DispatcherService {
             }
         }
 
-        log.info("Đã dispatch {}/{} messages tới Kafka",
-                successCount, processedDataList.size());
-
         // Cảnh báo nếu có messages fail
         int failedCount = processedDataList.size() - successCount;
         if (failedCount > 0) {

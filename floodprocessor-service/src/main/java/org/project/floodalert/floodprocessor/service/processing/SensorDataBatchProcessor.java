@@ -29,7 +29,6 @@ public class SensorDataBatchProcessor {
         }
 
         try {
-            // Extract sensor IDs (không cần parse nữa!)
             Set<String> sensorIds = extractSensorIds(messages);
 
             Map<String, Map<String, String>> redisDataMap =
@@ -64,10 +63,8 @@ public class SensorDataBatchProcessor {
     private Set<String> extractSensorIds(List<SensorMessage> messages) {
         Set<String> sensorIds = new HashSet<>();
         for (SensorMessage message : messages) {
-            // Ưu tiên lấy sensorId từ top-level của SensorMessage
             String sensorId = message.getSensorId();
             
-            // Fallback: nếu không có ở top-level, lấy từ deviceInfo
             if (sensorId == null || sensorId.isEmpty()) {
                 if (message.getSensorData() != null && 
                     message.getSensorData().getDeviceInfo() != null) {
@@ -84,6 +81,12 @@ public class SensorDataBatchProcessor {
 
     /**
      * Enrich Kafka data với Redis metadata và validate
+     * 
+     * Note: Ingestion service đã validate:
+     * - Timestamp, Blacklist, API key, Status, Water level sanity
+     * FloodProcessor chỉ cần validate:
+     * - Sensor registration (để lấy metadata)
+     * - Required thresholds (warning_threshold, danger_threshold)
      */
     private List<EnrichedSensorData> enrichAndValidate(
             List<SensorMessage> messages,
@@ -93,7 +96,7 @@ public class SensorDataBatchProcessor {
 
         for (SensorMessage message : messages) {
             try {
-                // Null safety checks
+                // Defensive null checks (nên giữ lại)
                 if (message.getSensorData() == null) {
                     log.warn("Message có sensorData = null, bỏ qua. Message: {}", message);
                     continue;
@@ -101,13 +104,8 @@ public class SensorDataBatchProcessor {
                 
                 var sensorData = message.getSensorData();
                 
-                if (sensorData.getDeviceInfo() == null) {
-                    log.warn("Message có deviceInfo = null, bỏ qua. SensorData: {}", sensorData);
-                    continue;
-                }
-                
-                if (sensorData.getTelemetry() == null) {
-                    log.warn("Message có telemetry = null, bỏ qua. SensorData: {}", sensorData);
+                if (sensorData.getDeviceInfo() == null || sensorData.getTelemetry() == null) {
+                    log.warn("Message thiếu deviceInfo hoặc telemetry, bỏ qua. SensorData: {}", sensorData);
                     continue;
                 }
                 
@@ -115,7 +113,6 @@ public class SensorDataBatchProcessor {
                 var telemetry = sensorData.getTelemetry();
                 var health = sensorData.getHealth();
                 
-                // Extract sensorId (ưu tiên top-level từ SensorMessage, fallback device_info)
                 String sensorId = message.getSensorId();
                 if (sensorId == null || sensorId.isEmpty()) {
                     sensorId = deviceInfo.getSensorId();
@@ -126,23 +123,24 @@ public class SensorDataBatchProcessor {
                     continue;
                 }
                 
+                // Lấy metadata từ Redis
                 Map<String, String> redisData = redisDataMap.get(sensorId);
 
-                // DROP message nếu sensor không được seed/register trong Redis
+                // Kiểm tra sensor đã đăng ký (cần metadata để enrich)
                 if (redisData == null || redisData.isEmpty()) {
-                    log.warn("Sensor {} chưa được đăng ký trong Redis, DROP message", sensorId);
+                    log.warn("❌ Sensor {} chưa được đăng ký trong Redis, DROP message", sensorId);
                     continue;
                 }
 
-                // Parse Redis data
+                // Parse thresholds từ Redis
                 Double warningLevel = parseDoubleFromRedis(redisData.get("warning_threshold"));
                 Double dangerLevel = parseDoubleFromRedis(redisData.get("danger_threshold"));
                 String streetName = redisData.get("location_name");
                 String district = redisData.get("district");
 
-                // Validate Redis data
+                // Validate required thresholds
                 if (warningLevel == null || dangerLevel == null) {
-                    log.warn("Sensor {} thiếu warning_threshold hoặc danger_threshold trong Redis, DROP message",
+                    log.warn("❌ Sensor {} thiếu warning_threshold hoặc danger_threshold trong Redis, DROP message",
                             sensorId);
                     continue;
                 }
@@ -173,12 +171,12 @@ public class SensorDataBatchProcessor {
                 enrichedList.add(enriched);
 
             } catch (Exception e) {
-                log.error("Lỗi khi enrich data cho message, bỏ qua. Error: {}, Message: {}", 
+                log.error("❌ Lỗi khi enrich data cho message, bỏ qua. Error: {}, Message: {}", 
                         e.getMessage(), message, e);
             }
         }
 
-        log.info("Enrich & validate hoàn tất: {}/{} messages hợp lệ",
+        log.info("✅ Enrich & validate hoàn tất: {}/{} messages hợp lệ",
                 enrichedList.size(), messages.size());
 
         return enrichedList;
@@ -196,9 +194,6 @@ public class SensorDataBatchProcessor {
         }
     }
 
-    /**
-     * Build location name từ street_name và district
-     */
     private String buildLocationName(String streetName, String district) {
         if (streetName != null && district != null) {
             return streetName + ", " + district;
