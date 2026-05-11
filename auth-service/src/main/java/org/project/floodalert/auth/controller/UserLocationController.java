@@ -31,7 +31,7 @@ public class UserLocationController {
         InternalUserDetails userDetails = (InternalUserDetails) authentication.getPrincipal();
         UUID userId = UUID.fromString(userDetails.getUserId());
 
-        log.debug("Received location update from user: {}", userId);
+        log.info("Received location update from user: {}", userId);
 
         userLocationService.updateLocation(userId, request.getLat(), request.getLon());
 

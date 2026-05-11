@@ -1,5 +1,6 @@
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
+
 spring:
   application:
     name: api-gateway
@@ -10,7 +11,7 @@ spring:
         cors-configurations:
           '[/**]':
             allowedOrigins:
-              - "http://localhost:5173"
+              - "${CORS_ALLOWED_ORIGINS:http://localhost:5173}"
             allowedMethods:
               - GET
               - POST
@@ -26,7 +27,7 @@ spring:
             maxAge: 3600
       routes:
         - id: auth-service
-          uri: http://localhost:8081
+          uri: ${AUTH_SERVICE_URL:http://localhost:8081}
           predicates:
             - Path=/flood-alert/api/v1/auth/**,
               /flood-alert/api/v1/roles/**,
@@ -37,7 +38,7 @@ spring:
             - StripPrefix=1
 
         - id: floodcore-service
-          uri: http://localhost:8083
+          uri: ${FLOODCORE_SERVICE_URL:http://localhost:8083}
           predicates:
             - Path=/flood-alert/api/v1/warnings/**,
               /flood-alert/api/v1/alerts/**,
@@ -51,21 +52,21 @@ spring:
             - StripPrefix=1
 
         - id: ingestion-service
-          uri: http://localhost:8082
+          uri: ${INGESTION_SERVICE_URL:http://localhost:8082}
           predicates:
             - Path=/flood-alert/api/admin/cache/**
           filters:
             - StripPrefix=1
 
         - id: notification-service
-          uri: http://localhost:8085
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
           predicates:
             - Path=/flood-alert/api/v1/notifications/**
           filters:
             - StripPrefix=1
 
         - id: notification-service-websocket-sockjs
-          uri: http://localhost:8085
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
           predicates:
             - Path=/flood-alert/ws-admin/**
           filters:
@@ -76,7 +77,7 @@ spring:
                 strategy: RETAIN_FIRST
 
         - id: notification-service-websocket-native
-          uri: http://localhost:8085
+          uri: ${NOTIFICATION_SERVICE_URL:http://localhost:8085}
           predicates:
             - Path=/flood-alert/ws
           filters:
@@ -89,4 +90,4 @@ spring:
 app:
   services:
     auth:
-      url: http://localhost:8081/api/v1/auth/verify
+      url: ${AUTH_VERIFY_URL:http://localhost:8081/api/v1/auth/verify}

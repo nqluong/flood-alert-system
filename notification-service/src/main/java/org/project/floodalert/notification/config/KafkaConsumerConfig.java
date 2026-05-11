@@ -82,4 +82,14 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, Object> fcmTokenKafkaListenerContainerFactory() {
         return createContainerFactory(fcmTokenConsumerFactory(), 2);
     }
+
+    @Bean
+    public ConsumerFactory<String, Object> userLocationConsumerFactory() {
+        return createConsumerFactory("org.project.floodalert.notification.dto.event.UserLocationEvent");
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, Object> userLocationKafkaListenerContainerFactory() {
+        return createContainerFactory(userLocationConsumerFactory(), 2);
+    }
 }

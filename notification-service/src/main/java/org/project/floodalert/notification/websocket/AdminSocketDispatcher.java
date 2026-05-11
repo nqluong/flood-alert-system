@@ -44,8 +44,6 @@ public class AdminSocketDispatcher {
             // Đẩy thẳng dữ liệu telemetry xuống client đang subscribe /topic/admin/map/telemetry
             simpMessagingTemplate.convertAndSend(TOPIC_TELEMETRY, slimDto);
 
-            log.info("[TELEMETRY] Đẩy WebSocket thành công sensorId={}, waterLevel={}cm, status={}",
-                    data.getSensorId(), data.getWaterLevel(), data.getStatus());
 
             acknowledgment.acknowledge();
 

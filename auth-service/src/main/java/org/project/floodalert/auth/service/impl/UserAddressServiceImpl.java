@@ -10,6 +10,7 @@ import org.project.floodalert.auth.exception.AuthErrorCode;
 import org.project.floodalert.auth.model.UserAddress;
 import org.project.floodalert.auth.repository.UserAddressRepository;
 import org.project.floodalert.auth.repository.UserRepository;
+import org.project.floodalert.auth.service.StaticLocationRedisService;
 import org.project.floodalert.auth.service.UserAddressService;
 import org.project.floodalert.common.exception.AppException;
 import org.springframework.stereotype.Service;
@@ -28,6 +29,7 @@ public class UserAddressServiceImpl implements UserAddressService {
 
     UserAddressRepository userAddressRepository;
     UserRepository userRepository;
+    StaticLocationRedisService staticLocationRedisService;
 
     @Override
     @Transactional(readOnly = true)
@@ -47,6 +49,7 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @Transactional
     public UserAddressResponse createAddress(UUID userId, UserAddressRequest addressRequest) {
         validateUserExists(userId);
 
@@ -63,10 +66,24 @@ public class UserAddressServiceImpl implements UserAddressService {
             userAddressRepository.unsetAllPrimaryForUser(userId);
         }
         UserAddress savedAddress = userAddressRepository.save(address);
+        
+        // Cập nhật Redis Geo
+        String zoneName = determineZoneName(savedAddress);
+        staticLocationRedisService.addOrUpdateLocation(
+                userId, 
+                savedAddress.getId(), 
+                zoneName,
+                savedAddress.getLat().doubleValue(),
+                savedAddress.getLon().doubleValue()
+        );
+        log.info("Đã tạo địa chỉ và cập nhật Redis: userId={}, addressId={}, zone={}", 
+                userId, savedAddress.getId(), zoneName);
+        
         return mapToAddressResponse(savedAddress);
     }
 
     @Override
+    @Transactional
     public UserAddressResponse updateAddress(UUID userId, UUID addressId, UserAddressRequest addressRequest) {
         UserAddress address = findAddressByIdAndUserId(addressId, userId);
 
@@ -78,16 +95,33 @@ public class UserAddressServiceImpl implements UserAddressService {
         if(addressRequest.getIsPrimary() != null && addressRequest.getIsPrimary()) {
             userAddressRepository.unsetPrimaryForUser(userId, addressId);
             address.setIsPrimary(true);
-
         }
         UserAddress updatedAddress = userAddressRepository.save(address);
+        
+        // Cập nhật Redis Geo
+        String zoneName = determineZoneName(updatedAddress);
+        staticLocationRedisService.addOrUpdateLocation(
+                userId,
+                updatedAddress.getId(),
+                zoneName,
+                updatedAddress.getLat().doubleValue(),
+                updatedAddress.getLon().doubleValue()
+        );
+        log.info("Đã cập nhật địa chỉ và Redis: userId={}, addressId={}, zone={}", 
+                userId, updatedAddress.getId(), zoneName);
+        
         return mapToAddressResponse(updatedAddress);
     }
 
     @Override
+    @Transactional
     public void deleteAddress(UUID userId, UUID addressId) {
         UserAddress address = findAddressByIdAndUserId(addressId, userId);
         userAddressRepository.delete(address);
+        
+        // Xóa khỏi Redis Geo
+        staticLocationRedisService.removeLocation(userId, addressId);
+        log.info("Đã xóa địa chỉ và cập nhật Redis: userId={}, addressId={}", userId, addressId);
     }
 
     @Override
@@ -101,6 +135,7 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @Transactional
     public void adminDeleteAddress(UUID addressId) {
         UserAddress userAddress = userAddressRepository.findById(addressId)
                 .orElseThrow(() -> new AppException(
@@ -108,6 +143,11 @@ public class UserAddressServiceImpl implements UserAddressService {
                         "Địa chỉ với ID " + addressId + " không tồn tại"
                 ));
         userAddressRepository.delete(userAddress);
+        
+        // Xóa khỏi Redis Geo
+        staticLocationRedisService.removeLocation(userAddress.getUserId(), addressId);
+        log.info("Admin đã xóa địa chỉ và cập nhật Redis: userId={}, addressId={}", 
+                userAddress.getUserId(), addressId);
     }
 
     private void validateUserExists(UUID userId) {
@@ -137,5 +177,33 @@ public class UserAddressServiceImpl implements UserAddressService {
                 .build();
     }
 
-
+    /**
+     * Xác định zone name từ address để lưu vào Redis
+     */
+    private String determineZoneName(UserAddress address) {
+        // Ưu tiên addressText, fallback sang addressType
+        if (address.getAddressText() != null && !address.getAddressText().isBlank()) {
+            String text = address.getAddressText().trim();
+            return text.length() > 50 ? text.substring(0, 50) : text;
+        }
+        
+        if (address.getAddressType() != null && !address.getAddressType().isBlank()) {
+            return mapAddressTypeToVietnamese(address.getAddressType());
+        }
+        
+        return "Địa điểm";
+    }
+    
+    /**
+     * Map address type sang tiếng Việt
+     */
+    private String mapAddressTypeToVietnamese(String addressType) {
+        return switch (addressType.toUpperCase()) {
+            case "HOME" -> "Nhà riêng";
+            case "WORK" -> "Công ty";
+            case "SCHOOL" -> "Trường học";
+            case "OTHER" -> "Khác";
+            default -> addressType;
+        };
+    }
 }

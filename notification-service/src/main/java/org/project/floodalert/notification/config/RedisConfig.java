@@ -74,22 +74,17 @@ public class RedisConfig {
 
     @Bean
     public RedisTemplate<String, Object> redisTemplate(RedisConnectionFactory connectionFactory) {
-        log.info("🔧 Configuring RedisTemplate");
-
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 
-        // Cấu hình ObjectMapper cho Jackson
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        // Sử dụng String serializer cho keys
         StringRedisSerializer stringSerializer = new StringRedisSerializer();
         template.setKeySerializer(stringSerializer);
         template.setHashKeySerializer(stringSerializer);
 
-        // Sử dụng JSON serializer cho values
         GenericJackson2JsonRedisSerializer jsonSerializer =
                 new GenericJackson2JsonRedisSerializer(objectMapper);
         template.setValueSerializer(jsonSerializer);
@@ -99,6 +94,26 @@ public class RedisConfig {
         template.afterPropertiesSet();
 
         log.info("RedisTemplate configured successfully");
+        return template;
+    }
+
+    @Bean(name = "geoRedisTemplate")
+    public RedisTemplate<String, String> geoRedisTemplate(RedisConnectionFactory connectionFactory) {
+        log.info("🔧 Configuring Geo RedisTemplate");
+
+        RedisTemplate<String, String> template = new RedisTemplate<>();
+        template.setConnectionFactory(connectionFactory);
+
+        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+        template.setKeySerializer(stringSerializer);
+        template.setValueSerializer(stringSerializer);
+        template.setHashKeySerializer(stringSerializer);
+        template.setHashValueSerializer(stringSerializer);
+
+        template.setEnableTransactionSupport(false);
+        template.afterPropertiesSet();
+
+        log.info("Geo RedisTemplate configured successfully");
         return template;
     }
 }

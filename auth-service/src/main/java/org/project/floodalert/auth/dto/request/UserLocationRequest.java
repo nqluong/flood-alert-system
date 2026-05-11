@@ -6,9 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 
-/**
- * Request DTO for updating user's GPS location.
- */
+
 @Data
 @Builder
 @NoArgsConstructor
