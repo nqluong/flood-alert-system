@@ -50,7 +50,7 @@ jwt:
 
 firebase:
   config:
-    path: ${FIREBASE_CONFIG_PATH:classpath:firebase-key.json}
+    path: ${FIREBASE_CONFIG_PATH:file:firebase-key.json}
 
 app:
   kafka:

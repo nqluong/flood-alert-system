@@ -55,7 +55,7 @@ flood-processor:
 firebase:
   storage:
     bucket-name: ${FIREBASE_STORAGE_BUCKET:flood-alert-c4f24.firebasestorage.app}
-    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:classpath:firebase-key.json}
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:file:firebase-key.json}
     signed-url-duration-minutes: ${FIREBASE_SIGNED_URL_DURATION:15}
 
 integration:
