@@ -62,7 +62,7 @@ public class FcmDispatchWorker {
                 return;
             }
 
-            log.info("[Virtual Thread] Bắt đầu dispatch {} notifications PENDING",
+            log.debug("[Virtual Thread] Bắt đầu dispatch {} notifications PENDING",
                     pendingNotifications.size());
 
             List<Notification> validNotifications = filterValidNotificationsParallel(pendingNotifications);
@@ -76,7 +76,7 @@ public class FcmDispatchWorker {
             sendToFirebaseParallel(validNotifications);
 
             long duration = System.currentTimeMillis() - startTime;
-            log.info("Hoàn tất dispatch batch trong {}ms (Virtual Threads)", duration);
+            log.debug("Hoàn tất dispatch batch trong {}ms (Virtual Threads)", duration);
 
         } catch (Exception e) {
             log.error("Lỗi trong dispatchPendingNotifications", e);
@@ -150,7 +150,7 @@ public class FcmDispatchWorker {
     }
 
     private void sendToFirebaseParallel(List<Notification> notifications) {
-        log.info("Sending {} notifications to Firebase với sub-batch parallel processing",
+        log.debug("Sending {} notifications to Firebase với sub-batch parallel processing",
                 notifications.size());
 
         List<List<Notification>> subBatches = partitionList(notifications, SUB_BATCH_SIZE);
@@ -171,7 +171,7 @@ public class FcmDispatchWorker {
         // Wait for all sub-batches to complete
         CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
 
-        log.info("Hoàn tất gửi tất cả sub-batches");
+        log.debug("Hoàn tất gửi tất cả sub-batches");
     }
 
     /**
@@ -228,7 +228,7 @@ public class FcmDispatchWorker {
 
         if (!toUpdate.isEmpty()) {
             notificationRepository.saveAll(toUpdate);
-            log.info("Đã mark {} notifications thành FAILED do thiếu FCM token", toUpdate.size());
+            log.debug("Đã mark {} notifications thành FAILED do thiếu FCM token", toUpdate.size());
         }
     }
 
@@ -329,7 +329,7 @@ public class FcmDispatchWorker {
         // Batch update
         if (!toUpdate.isEmpty()) {
             notificationRepository.saveAll(toUpdate);
-            log.info("Đã cập nhật status cho {} notifications", toUpdate.size());
+            log.debug("Đã cập nhật status cho {} notifications", toUpdate.size());
         }
     }
 

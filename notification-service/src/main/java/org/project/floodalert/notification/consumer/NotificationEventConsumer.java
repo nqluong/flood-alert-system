@@ -44,7 +44,7 @@ public class NotificationEventConsumer {
     public void consumeFloodLifecycleEvent(FloodLifecycleEvent event, Acknowledgment ack) {
         try {
             log.info("========== BẮT ĐẦU XỬ LÝ FLOOD LIFECYCLE EVENT ==========");
-            log.info("Event ID: {}, Type: {}, Location: ({}, {}), Severity: {}",
+            log.debug("Event ID: {}, Type: {}, Location: ({}, {}), Severity: {}",
                     event.getEventId(), event.getType(), event.getLat(), event.getLon(), 
                     event.getSeverityLevel());
 
@@ -58,7 +58,7 @@ public class NotificationEventConsumer {
                 return;
             }
             
-            log.info("Tìm thấy {} users bị ảnh hưởng", contexts.size());
+            log.debug("Tìm thấy {} users bị ảnh hưởng", contexts.size());
             
             Map<UUID, NotificationContext> filteredContexts = filterThroughPreferences(contexts);
             
@@ -68,10 +68,10 @@ public class NotificationEventConsumer {
                 return;
             }
             
-            log.info("Sau khi filter: {} users sẽ nhận thông báo", filteredContexts.size());
+            log.debug("Sau khi filter: {} users sẽ nhận thông báo", filteredContexts.size());
             List<Notification> notifications = generateNotifications(filteredContexts, floodEventDTO);
             
-            log.info("Đã tạo {} notifications", notifications.size());
+            log.debug("Đã tạo {} notifications", notifications.size());
             
             int successCount = fcmDispatchService.sendBatch(notifications);
             
@@ -158,7 +158,7 @@ public class NotificationEventConsumer {
                 })
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         
-        log.info("Filter hoàn tất: {}/{} users pass", filtered.size(), contexts.size());
+        log.debug("Filter hoàn tất: {}/{} users pass", filtered.size(), contexts.size());
         
         return filtered;
     }
@@ -211,7 +211,7 @@ public class NotificationEventConsumer {
                             .priority(determinePriority(event.getSeverityLevel()))
                             .data(data)
                             .channel(NotificationChannel.PUSH)
-                            .fcmToken(null) // Sẽ được điền bởi FcmDispatchService
+                            .fcmToken(null)
                             .status(NotificationStatus.PENDING)
                             .retryCount(0)
                             .maxRetries(MAX_RETRIES)
@@ -262,13 +262,10 @@ public class NotificationEventConsumer {
             case "DANGER", "HIGH" -> "Nguy hiểm";
             case "WARNING", "MEDIUM" -> "Cảnh báo";
             case "LOW" -> "Thấp";
-            default -> severityLevel; // Giữ nguyên nếu không match
+            default -> severityLevel;
         };
     }
 
-    /**
-     * Xác định priority dựa trên severity level
-     */
     private NotificationPriority determinePriority(String severityLevel) {
         if (severityLevel == null) {
             return NotificationPriority.NORMAL;

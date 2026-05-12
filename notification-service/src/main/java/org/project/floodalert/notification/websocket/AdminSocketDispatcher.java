@@ -60,7 +60,7 @@ public class AdminSocketDispatcher {
             // Đẩy thẳng sự kiện cảnh báo xuống client đang subscribe /topic/admin/alerts
             simpMessagingTemplate.convertAndSend(TOPIC_ALERTS, event);
 
-            log.info("[ALERT] Đẩy WebSocket cảnh báo thành công eventId={}, type={}, location={}, severity={}",
+            log.debug("[ALERT] Đẩy WebSocket cảnh báo thành công eventId={}, type={}, location={}, severity={}",
                     event.getEventId(), event.getType(), event.getLocation(), event.getSeverityLevel());
 
             acknowledgment.acknowledge();

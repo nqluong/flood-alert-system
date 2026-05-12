@@ -22,12 +22,12 @@ public class UserLocationEventConsumer {
     )
     public void consumeUserLocationEvent(UserLocationEvent event, Acknowledgment ack) {
         try {
-            log.info("[UserLocationEventConsumer] Nhận user location event - userId: {}, eventType: {}, location: ({}, {})",
+            log.debug("[UserLocationEventConsumer] Nhận user location event - userId: {}, eventType: {}, location: ({}, {})",
                     event.getUserId(), event.getEventType(), event.getLatitude(), event.getLongitude());
 
             switch (event.getEventType()) {
                 case "UPSERT":
-                    log.info("[UserLocationEventConsumer] Đồng bộ vị trí user {} vào Redis Geo", event.getUserId());
+                    log.debug("[UserLocationEventConsumer] Đồng bộ vị trí user {} vào Redis Geo", event.getUserId());
                     userLocationSyncService.syncUserLocationToRedis(
                             event.getUserId(),
                             event.getLatitude(),
@@ -36,7 +36,7 @@ public class UserLocationEventConsumer {
                     break;
 
                 case "DELETE":
-                    log.info("[UserLocationEventConsumer] Xóa vị trí user {} khỏi Redis Geo", event.getUserId());
+                    log.debug("[UserLocationEventConsumer] Xóa vị trí user {} khỏi Redis Geo", event.getUserId());
                     userLocationSyncService.removeUserLocationFromRedis(event.getUserId());
                     break;
 

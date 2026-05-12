@@ -99,8 +99,6 @@ public class RedisConfig {
 
     @Bean(name = "geoRedisTemplate")
     public RedisTemplate<String, String> geoRedisTemplate(RedisConnectionFactory connectionFactory) {
-        log.info("🔧 Configuring Geo RedisTemplate");
-
         RedisTemplate<String, String> template = new RedisTemplate<>();
         template.setConnectionFactory(connectionFactory);
 

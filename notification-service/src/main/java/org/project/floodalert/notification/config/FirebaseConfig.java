@@ -54,19 +54,11 @@ public class FirebaseConfig {
             log.error("Failed to initialize Firebase Admin SDK", e);
             log.error("Make sure '{}' exists in classpath or is configured correctly", serviceAccountPath);
             log.error("Push notifications will NOT work!");
-
-            // Depending on your requirements, you might want to throw an exception here
-            // to prevent the application from starting if Firebase is critical
-            // throw new IllegalStateException("Cannot initialize Firebase", e);
         }
     }
 
-    /**
-     * Load service account file from classpath or file system
-     */
     private InputStream loadServiceAccountFile() throws IOException {
         try {
-            // Try loading from classpath first
             ClassPathResource resource = new ClassPathResource(serviceAccountPath);
             if (resource.exists()) {
                 log.info("Loading Firebase credentials from classpath: {}", serviceAccountPath);
@@ -76,7 +68,6 @@ public class FirebaseConfig {
             log.debug("Service account not found in classpath, trying file system", e);
         }
 
-        // Try loading from file system
         try {
             log.info("Loading Firebase credentials from file system: {}", serviceAccountPath);
             return new FileInputStream(serviceAccountPath);

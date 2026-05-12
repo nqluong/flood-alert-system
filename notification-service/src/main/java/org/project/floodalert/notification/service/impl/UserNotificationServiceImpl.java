@@ -29,7 +29,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
     @Override
     @Transactional(readOnly = true)
     public NotificationListResponse getUserNotifications(UUID userId, int page, int size) {
-        log.info("[UserNotificationService] Lấy danh sách thông báo: userId={}, page={}, size={}", 
+        log.debug("[UserNotificationService] Lấy danh sách thông báo: userId={}, page={}, size={}",
                 userId, page, size);
 
         if (page < 0) page = 0;
@@ -45,7 +45,7 @@ public class UserNotificationServiceImpl implements UserNotificationService {
 
         long unreadCount = notificationRepository.countUnreadByUserId(userId);
 
-        log.info("[UserNotificationService] Tìm thấy {} thông báo, {} chưa đọc", 
+        log.debug("[UserNotificationService] Tìm thấy {} thông báo, {} chưa đọc",
                 notifications.size(), unreadCount);
 
         return NotificationListResponse.builder()
@@ -63,11 +63,11 @@ public class UserNotificationServiceImpl implements UserNotificationService {
     @Override
     @Transactional(readOnly = true)
     public UnreadCountResponse getUnreadCount(UUID userId) {
-        log.info("[UserNotificationService] Đếm thông báo chưa đọc: userId={}", userId);
+        log.debug("[UserNotificationService] Đếm thông báo chưa đọc: userId={}", userId);
         
         long unreadCount = notificationRepository.countUnreadByUserId(userId);
         
-        log.info("[UserNotificationService] userId={} có {} thông báo chưa đọc", userId, unreadCount);
+        log.debug("[UserNotificationService] userId={} có {} thông báo chưa đọc", userId, unreadCount);
         
         return UnreadCountResponse.builder()
                 .unreadCount(unreadCount)
@@ -77,13 +77,13 @@ public class UserNotificationServiceImpl implements UserNotificationService {
     @Override
     @Transactional
     public void markAsRead(UUID userId, UUID notificationId) {
-        log.info("[UserNotificationService] Đánh dấu đã đọc: userId={}, notificationId={}", 
+        log.debug("[UserNotificationService] Đánh dấu đã đọc: userId={}, notificationId={}",
                 userId, notificationId);
 
         int updated = notificationRepository.markAsRead(notificationId, userId, LocalDateTime.now());
         
         if (updated > 0) {
-            log.info("[UserNotificationService] Đã đánh dấu đọc thông báo: {}", notificationId);
+            log.debug("[UserNotificationService] Đã đánh dấu đọc thông báo: {}", notificationId);
         } else {
             log.warn("[UserNotificationService] Không tìm thấy thông báo hoặc đã đọc rồi: {}", notificationId);
         }
@@ -92,11 +92,11 @@ public class UserNotificationServiceImpl implements UserNotificationService {
     @Override
     @Transactional
     public void markAllAsRead(UUID userId) {
-        log.info("[UserNotificationService] Đánh dấu tất cả đã đọc: userId={}", userId);
+        log.debug("[UserNotificationService] Đánh dấu tất cả đã đọc: userId={}", userId);
 
         int updated = notificationRepository.markAllAsRead(userId, LocalDateTime.now());
         
-        log.info("[UserNotificationService] Đã đánh dấu đọc {} thông báo cho userId={}", updated, userId);
+        log.debug("[UserNotificationService] Đã đánh dấu đọc {} thông báo cho userId={}", updated, userId);
     }
 
     private NotificationResponse toNotificationResponse(Notification notification) {

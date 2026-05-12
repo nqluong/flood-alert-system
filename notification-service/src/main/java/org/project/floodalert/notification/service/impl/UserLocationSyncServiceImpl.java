@@ -47,7 +47,7 @@ public class UserLocationSyncServiceImpl implements UserLocationSyncService {
             String heartbeatKey = HEARTBEAT_PREFIX + userId.toString();
             redisTemplate.opsForValue().set(heartbeatKey, System.currentTimeMillis(), HEARTBEAT_TTL);
 
-            log.info("Đã đồng bộ vị trí user {} vào Redis Geo: ({}, {}), added={}", 
+            log.debug("Đã đồng bộ vị trí user {} vào Redis Geo: ({}, {}), added={}",
                     userId, latitude, longitude, added);
 
         } catch (Exception e) {

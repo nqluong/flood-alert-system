@@ -15,10 +15,6 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-/**
- * Service xử lý gửi batch FCM notifications
- * Sử dụng Firebase Admin SDK để gửi hàng loạt
- */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -42,7 +38,7 @@ public class FcmDispatchService {
             return 0;
         }
         
-        log.info("Bắt đầu gửi batch {} notifications", notifications.size());
+        log.debug("Bắt đầu gửi batch {} notifications", notifications.size());
         
         // Bước 1: Fetch FCM tokens cho tất cả users
         Map<UUID, String> userTokenMap = fetchFcmTokens(notifications);
@@ -61,7 +57,7 @@ public class FcmDispatchService {
             return 0;
         }
         
-        log.info("Có {} notifications hợp lệ (có FCM token) từ {} notifications ban đầu",
+        log.debug("Có {} notifications hợp lệ (có FCM token) từ {} notifications ban đầu",
                 validNotifications.size(), notifications.size());
         
         // Bước 3: Save notifications để generate ID (cần cho buildFirebaseMessage)
@@ -74,7 +70,7 @@ public class FcmDispatchService {
         // Bước 5: Lưu lại kết quả (update status)
         notificationRepository.saveAll(notifications);
         
-        log.info("Hoàn tất gửi batch: {}/{} thành công", successCount, validNotifications.size());
+        log.debug("Hoàn tất gửi batch: {}/{} thành công", successCount, validNotifications.size());
         
         return successCount;
     }
@@ -139,7 +135,7 @@ public class FcmDispatchService {
         // Chia thành các batch nhỏ (Firebase limit 500 messages/batch)
         List<List<Notification>> batches = partitionList(notifications, FCM_BATCH_SIZE);
         
-        log.info("Chia thành {} batches để gửi (batch size: {})", batches.size(), FCM_BATCH_SIZE);
+        log.debug("Chia thành {} batches để gửi (batch size: {})", batches.size(), FCM_BATCH_SIZE);
         
         for (int i = 0; i < batches.size(); i++) {
             List<Notification> batch = batches.get(i);
@@ -168,7 +164,7 @@ public class FcmDispatchService {
             int successCount = response.getSuccessCount();
             int failureCount = response.getFailureCount();
             
-            log.info("Firebase batch response: {} success, {} failed", successCount, failureCount);
+            log.debug("Firebase batch response: {} success, {} failed", successCount, failureCount);
             
             // Xử lý kết quả từng message
             List<SendResponse> responses = response.getResponses();

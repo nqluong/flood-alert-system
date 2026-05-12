@@ -85,3 +85,5 @@ logging:
   level:
     org.apache.kafka: WARN
     org.springframework.kafka: INFO
+    root: warn
+    org.hibernate.SQL: ERROR

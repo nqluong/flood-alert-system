@@ -45,7 +45,7 @@ public class NotificationAggregationService {
     }
 
     public Map<UUID, NotificationContext> aggregateNotificationContexts(FloodEventDTO event) {
-        log.info("Bắt đầu quét Redis Geo cho event: eventId={}, location=({}, {}), radius={}m",
+        log.debug("Bắt đầu quét Redis Geo cho event: eventId={}, location=({}, {}), radius={}m",
                 event.getEventId(), event.getLat(), event.getLon(), event.getRadiusMeters());
         
         CompletableFuture<Map<UUID, NotificationContext>> activeFuture =
@@ -62,12 +62,12 @@ public class NotificationAggregationService {
             Map<UUID, NotificationContext> activeResults = activeFuture.get();
             Map<UUID, NotificationContext> staticResults = staticFuture.get();
             
-            log.info("Quét Redis hoàn tất: {} active users, {} static locations",
+            log.debug("Quét Redis hoàn tất: {} active users, {} static locations",
                     activeResults.size(), staticResults.size());
             
             Map<UUID, NotificationContext> mergedContexts = mergeContexts(activeResults, staticResults);
             
-            log.info("Aggregation hoàn tất: Tổng {} unique users bị ảnh hưởng", mergedContexts.size());
+            log.debug("Aggregation hoàn tất: Tổng {} unique users bị ảnh hưởng", mergedContexts.size());
             
             return mergedContexts;
             
@@ -262,7 +262,7 @@ public class NotificationAggregationService {
         long onlyStatic = merged.values().stream()
                 .filter(ctx -> !ctx.isNearActive() && !ctx.getAffectedZones().isEmpty()).count();
         
-        log.info("Phân loại users: {} dính cả 2, {} chỉ active, {} chỉ static",
+        log.debug("Phân loại users: {} dính cả 2, {} chỉ active, {} chỉ static",
                 bothAffected, onlyActive, onlyStatic);
         
         return merged;

@@ -7,9 +7,6 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-/**
- * Listener để sync tất cả địa chỉ từ database lên Redis khi application khởi động
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

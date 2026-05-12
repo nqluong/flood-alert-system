@@ -43,7 +43,7 @@ public class NotificationPreferenceServiceImpl implements NotificationPreference
         updatePreferenceFromDTO(preference, dto);
 
         NotificationPreference saved = notificationPreferenceRepository.save(preference);
-        log.info("Successfully updated notification preferences for user: {}", userId);
+        log.debug("Successfully updated notification preferences for user: {}", userId);
 
         return mapToResponse(saved);
     }
