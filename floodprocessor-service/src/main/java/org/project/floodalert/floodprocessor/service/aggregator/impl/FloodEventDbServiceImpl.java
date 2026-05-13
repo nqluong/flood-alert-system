@@ -6,6 +6,7 @@ import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.enums.FloodStatus;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
+import org.project.floodalert.floodprocessor.model.IoTReading;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
 import org.project.floodalert.floodprocessor.repository.IotReadingRepository;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService;
@@ -15,7 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
 @Slf4j
@@ -61,6 +63,83 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
         return result;
     }
 
+
+    @Transactional
+    public List<FloodEventDbResult> processAndSaveBatch(List<ProcessedSensorData> dataList) {
+        if (dataList == null || dataList.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        
+        List<String> sensorIds = dataList.stream()
+                .map(ProcessedSensorData::getSensorId)
+                .distinct()
+                .toList();
+
+        // Lấy tất cả active events trong 1 query duy nhất
+        List<FloodEvent> activeEvents = floodEventRepository.findActiveEventsBySensorIds(sensorIds, now);
+        
+        Map<String, FloodEvent> activeEventMap = activeEvents.stream()
+                .collect(Collectors.toMap(
+                        FloodEvent::getSourceId,
+                        event -> event,
+                        (existing, replacement) -> existing
+                ));
+
+        log.debug("Batch query: Tìm thấy {} active events cho {} sensors", 
+                activeEventMap.size(), sensorIds.size());
+
+        // Xử lý từng sensor data
+        List<FloodEventDbResult> results = new ArrayList<>();
+        List<FloodEvent> eventsToSave = new ArrayList<>();
+        List<BackLinkTask> backLinkTasks = new ArrayList<>();
+
+        for (ProcessedSensorData data : dataList) {
+            try {
+                String sensorId = data.getSensorId();
+                FloodStatus newStatus = data.getStatus();
+                Optional<FloodEvent> activeEventOpt = Optional.ofNullable(activeEventMap.get(sensorId));
+
+                FloodEventDbResult result = switch (newStatus) {
+                    case SAFE -> handleScenarioA(data, activeEventOpt);
+                    case WARNING, DANGER -> handleScenarioBC(data, activeEventOpt, newStatus);
+                    default -> {
+                        log.warn("Trạng thái không xác định [{}] cho sensor [{}], bỏ qua", 
+                                newStatus, sensorId);
+                        yield FloodEventDbResult.noAction();
+                    }
+                };
+
+                results.add(result);
+
+                if (result.floodEvent() != null) {
+                    eventsToSave.add(result.floodEvent());
+                    
+                    if (data.getReadingId() != null) {
+                        backLinkTasks.add(new BackLinkTask(data.getReadingId(), result.floodEvent()));
+                    }
+                }
+
+            } catch (Exception e) {
+                log.error("Lỗi xử lý sensor [{}] trong batch: {}", 
+                        data.getSensorId(), e.getMessage(), e);
+                results.add(FloodEventDbResult.noAction());
+            }
+        }
+
+        if (!eventsToSave.isEmpty()) {
+            floodEventRepository.saveAll(eventsToSave);
+            log.debug("Batch save: Lưu {} flood events", eventsToSave.size());
+        }
+
+        if (!backLinkTasks.isEmpty()) {
+            batchBackLinkIotReadings(backLinkTasks);
+        }
+
+        return results;
+    }
+
     /**
      * Kịch bản A: Sensor gửi trạng thái SAFE.
      * - Nếu có sự kiện active Chuyển thành RESOLVED.
@@ -81,9 +160,7 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
         event.setStatus("RESOLVED");
         event.setExpiresAt(LocalDateTime.now());
 
-        FloodEvent savedEvent = floodEventRepository.save(event);
-
-        return new FloodEventDbResult(savedEvent, LifecycleEventType.RESOLVED, true);
+        return new FloodEventDbResult(event, LifecycleEventType.RESOLVED, true);
     }
 
     private FloodEventDbResult handleScenarioBC(ProcessedSensorData data,
@@ -122,9 +199,7 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
                 .expiresAt(now.plusMinutes(EVENT_TTL_MINUTES))
                 .build();
 
-        FloodEvent savedEvent = floodEventRepository.save(newEvent);
-
-        return new FloodEventDbResult(savedEvent, LifecycleEventType.CREATED, true);
+        return new FloodEventDbResult(newEvent, LifecycleEventType.CREATED, true);
     }
 
     /**
@@ -132,6 +207,7 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
      * - Cập nhật water_level nếu mức mới cao hơn.
      * - Gia hạn expires_at thêm 30 phút.
      * - Phát hiện ESCALATED nếu mức độ tăng (VD: WARNING → DANGER).
+     * - Phát hiện DE_ESCALATED nếu mức độ giảm (VD: DANGER → WARNING).
      */
     private FloodEventDbResult handleScenarioC(ProcessedSensorData data,
                                                 FloodEvent activeEvent,
@@ -154,18 +230,27 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
         // Cập nhật mức độ cảnh báo theo trạng thái mới
         activeEvent.setSeverityLevel(newStatus.name());
 
-        // Gia hạn thời gian hết hạn
         activeEvent.setExpiresAt(LocalDateTime.now().plusMinutes(EVENT_TTL_MINUTES));
 
-        FloodEvent savedEvent = floodEventRepository.save(activeEvent);
-        boolean escalated = isEscalated(previousSeverity, newStatus);
-        if (escalated) {
-            return new FloodEventDbResult(savedEvent, LifecycleEventType.ESCALATED, true);
-        }
-
-        log.debug("Sự kiện [{}] chỉ được gia hạn thời gian, không publish lifecycle event",
-                savedEvent.getEventId());
-        return new FloodEventDbResult(savedEvent, null, false);
+        SeverityChange severityChange = detectSeverityChange(previousSeverity, newStatus);
+        
+        return switch (severityChange) {
+            case ESCALATED -> {
+                log.info("Mức độ ngập gia tăng: {} → {} cho sự kiện [{}]",
+                        previousSeverity, newStatus, activeEvent.getEventId());
+                yield new FloodEventDbResult(activeEvent, LifecycleEventType.ESCALATED, true);
+            }
+            case DE_ESCALATED -> {
+                log.info("Mức độ ngập giảm: {} → {} cho sự kiện [{}]",
+                        previousSeverity, newStatus, activeEvent.getEventId());
+                yield new FloodEventDbResult(activeEvent, LifecycleEventType.DE_ESCALATED, true);
+            }
+            case NO_CHANGE -> {
+                log.debug("Sự kiện [{}] chỉ được gia hạn thời gian, không thay đổi severity",
+                        activeEvent.getEventId());
+                yield new FloodEventDbResult(activeEvent, null, false);
+            }
+        };
     }
 
     private void backLinkIotReading(String readingId, FloodEvent floodEvent) {
@@ -179,33 +264,93 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
         }
     }
 
-    /**
-     * Tạo eventId theo định dạng: EV-yyyyMMdd-HHmmss-{sensorId}.
-     * EV-20260220-143025-SENSOR_001
-     */
+    private void batchBackLinkIotReadings(List<BackLinkTask> tasks) {
+        if (tasks.isEmpty()) {
+            return;
+        }
+
+        try {
+            List<String> readingIds = tasks.stream()
+                    .map(BackLinkTask::readingId)
+                    .toList();
+
+            List<IoTReading> readings = iotReadingRepository.findAllByReadingIds(readingIds);
+
+            Map<String, IoTReading> readingMap = readings.stream()
+                    .collect(Collectors.toMap(IoTReading::getReadingId, r -> r));
+
+            int updateCount = 0;
+            for (BackLinkTask task : tasks) {
+                IoTReading reading = readingMap.get(task.readingId);
+                if (reading != null) {
+                    reading.setFloodEventId(task.floodEvent.getId());
+                    updateCount++;
+                } else {
+                    log.warn("Không tìm thấy IoTReading với readingId: {}", task.readingId);
+                }
+            }
+
+            if (updateCount > 0) {
+                iotReadingRepository.saveAll(readings);
+            }
+
+        } catch (Exception e) {
+            log.error("Lỗi batch back-link, fallback sang update từng record: {}", e.getMessage());
+            
+            int successCount = 0;
+            for (BackLinkTask task : tasks) {
+                try {
+                    iotReadingRepository.updateFloodEventIdByReadingId(
+                            task.floodEvent.getId(), 
+                            task.readingId
+                    );
+                    successCount++;
+                } catch (Exception ex) {
+                    log.warn("Back-link thất bại cho reading [{}]: {}", 
+                            task.readingId, ex.getMessage());
+                }
+            }
+            log.debug("Fallback back-link: {}/{} thành công", successCount, tasks.size());
+        }
+    }
+
     private String generateEventId(String sensorId) {
         String timestamp = LocalDateTime.now().format(EVENT_ID_FORMATTER);
         return "EV-" + timestamp + "-" + sensorId;
     }
 
-    /**
-     * Kiểm tra xem mức độ cảnh báo có leo thang hay không.
-     * So sánh `severity` (số nguyên) của trạng thái trước và mới.
-     */
-    private boolean isEscalated(String previousSeverity, FloodStatus newStatus) {
+    private enum SeverityChange {
+        ESCALATED,      // Mức độ tăng
+        DE_ESCALATED,   // Mức độ giảm
+        NO_CHANGE       // Không thay đổi
+    }
+
+    private SeverityChange detectSeverityChange(String previousSeverity, FloodStatus newStatus) {
         if (previousSeverity == null) {
-            return false;
+            return SeverityChange.NO_CHANGE;
         }
+        
         try {
             FloodStatus prevEnum = FloodStatus.valueOf(previousSeverity);
-            return newStatus.getSeverity() > prevEnum.getSeverity();
+            int prevSeverity = prevEnum.getSeverity();
+            int newSeverity = newStatus.getSeverity();
+            
+            if (newSeverity > prevSeverity) {
+                return SeverityChange.ESCALATED;
+            } else if (newSeverity < prevSeverity) {
+                return SeverityChange.DE_ESCALATED;
+            } else {
+                return SeverityChange.NO_CHANGE;
+            }
         } catch (IllegalArgumentException e) {
-            log.warn("Không parse được severity cũ [{}], bỏ qua kiểm tra escalated", previousSeverity);
-            return false;
+            log.warn("Không parse được severity cũ [{}], coi như không thay đổi", previousSeverity);
+            return SeverityChange.NO_CHANGE;
         }
     }
 
     private BigDecimal toBigDecimal(Double value) {
         return value != null ? BigDecimal.valueOf(value) : null;
     }
+
+    private record BackLinkTask(String readingId, FloodEvent floodEvent) {}
 }

@@ -12,6 +12,7 @@ import org.project.floodalert.floodprocessor.service.aggregator.FloodEventProces
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -27,85 +28,56 @@ import java.util.List;
 public class FloodEventProcessorServiceImpl implements FloodEventProcessorService {
 
     private final FloodEventDbService floodEventDbService;
-//    private final FloodGeoCacheService floodGeoCacheService;
     private final LifecycleEventPublisher lifecycleEventPublisher;
 
-
-    /**
-     * {@inheritDoc}
-     * Xử lý một bản ghi sensor đơn lẻ qua đầy đủ 3 bước.
-     */
-    @Override
-    public void process(ProcessedSensorData data) {
-        if (data == null || data.getSensorId() == null) {
-            log.warn("Dữ liệu sensor null hoặc thiếu sensorId, bỏ qua xử lý aggregator");
-            return;
-        }
-
-        try {
-            // Xử lý DB (kịch bản A/B/C) + back-link IoTReading
-            FloodEventDbResult dbResult = floodEventDbService.processAndSave(data);
-
-            if (dbResult.floodEvent() == null) {
-                return;
-            }
-
-            FloodEvent floodEvent = dbResult.floodEvent();
-
-            // Đồng bộ Redis Cache
-//            syncRedisCache(data.getStatus(), floodEvent);
-
-            // Publish Lifecycle Event (nếu cần)
-            if (dbResult.shouldPublish()) {
-                FloodLifecycleEvent lifecycleEvent =
-                        buildLifecycleEvent(floodEvent, dbResult);
-                lifecycleEventPublisher.publish(lifecycleEvent);
-            }
-
-            log.debug("Hoàn thành xử lý aggregator cho sensor [{}], sự kiện [{}], type [{}]",
-                    data.getSensorId(), floodEvent.getEventId(), dbResult.lifecycleEventType());
-
-        } catch (Exception e) {
-            log.error("Lỗi khi xử lý aggregator cho sensor [{}]: {}",
-                    data.getSensorId(), e.getMessage(), e);
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     * Xử lý từng bản ghi trong batch độc lập.
-     * Lỗi của một bản ghi không làm dừng các bản ghi còn lại.
-     */
     @Override
     public void processBatch(List<ProcessedSensorData> dataList) {
         if (dataList == null || dataList.isEmpty()) {
             log.debug("Batch rỗng, bỏ qua xử lý aggregator");
             return;
         }
-        for (ProcessedSensorData data : dataList) {
-            try {
-                process(data);
-            } catch (Exception e) {
-                log.error("Lỗi xử lý aggregator cho sensor [{}] trong batch: {}",
-                        data != null ? data.getSensorId() : "null", e.getMessage());
-            }
-        }
 
+        log.debug("Bắt đầu xử lý batch {} sensors với batch optimization", dataList.size());
+
+        try {
+            List<FloodEventDbResult> results =
+                    ((FloodEventDbServiceImpl) floodEventDbService).processAndSaveBatch(dataList);
+
+            List<FloodLifecycleEvent> eventsToPublish = new ArrayList<>();
+            
+            for (int i = 0; i < results.size(); i++) {
+                FloodEventDbResult result = results.get(i);
+                ProcessedSensorData data = dataList.get(i);
+                
+                if (result.shouldPublish() && result.floodEvent() != null) {
+                    FloodLifecycleEvent lifecycleEvent = 
+                            buildLifecycleEvent(result.floodEvent(), result);
+                    eventsToPublish.add(lifecycleEvent);
+                }
+                
+                log.debug("Hoàn thành xử lý aggregator cho sensor [{}], sự kiện [{}], type [{}]",
+                        data.getSensorId(), 
+                        result.floodEvent() != null ? result.floodEvent().getEventId() : "null",
+                        result.lifecycleEventType());
+            }
+
+            // Batch publish Kafka events
+            if (!eventsToPublish.isEmpty()) {
+                for (FloodLifecycleEvent event : eventsToPublish) {
+                    lifecycleEventPublisher.publish(event);
+                }
+                log.debug("Batch publish: Gửi {} lifecycle events ra Kafka", eventsToPublish.size());
+            }
+
+            log.info("Hoàn thành xử lý batch: {}/{} sensors thành công", 
+                    results.size(), dataList.size());
+
+        } catch (Exception e) {
+            log.error("Lỗi nghiêm trọng khi xử lý batch, fallback sang xử lý từng sensor: {}", 
+                    e.getMessage(), e);
+        }
     }
 
-//    private void syncRedisCache(FloodStatus newStatus, FloodEvent floodEvent) {
-//        if (newStatus == FloodStatus.SAFE) {
-//            // Kịch bản A – Nước rút: xóa khỏi cache
-//            floodGeoCacheService.removeResolvedFloodEvent(floodEvent.getEventId());
-//        } else {
-//            // Kịch bản B hoặc C – Đang ngập: thêm/cập nhật cache
-//            floodGeoCacheService.syncActiveFloodEvent(floodEvent);
-//        }
-//    }
-
-    /**
-     * Xây dựng {@link FloodLifecycleEvent} từ kết quả DB để publish ra Kafka.
-     */
     private FloodLifecycleEvent buildLifecycleEvent(FloodEvent floodEvent,
                                                      FloodEventDbResult dbResult) {
         return FloodLifecycleEvent.builder()

@@ -37,6 +37,26 @@ public interface FloodEventRepository extends JpaRepository<FloodEvent, UUID> {
             @Param("sensorId") String sensorId,
             @Param("now") LocalDateTime now);
 
+    /**
+     * Tìm tất cả sự kiện ngập đang Active của nhiều sensors (batch query).
+     * Tối ưu hóa để tránh N+1 query problem.
+     *
+     * @param sensorIds danh sách mã định danh của sensors
+     * @param now       thời điểm hiện tại để so sánh expires_at
+     * @return danh sách sự kiện active
+     */
+    @Query("""
+            SELECT e FROM FloodEvent e
+            WHERE e.source = 'SENSOR'
+              AND e.sourceId IN :sensorIds
+              AND e.status IN ('PENDING', 'CONFIRMED')
+              AND e.expiresAt > :now
+            ORDER BY e.sourceId, e.createdAt DESC
+            """)
+    List<FloodEvent> findActiveEventsBySensorIds(
+            @Param("sensorIds") List<String> sensorIds,
+            @Param("now") LocalDateTime now);
+
 
     @Query(value = """
             SELECT * FROM flood_events e

@@ -3,6 +3,7 @@ package org.project.floodalert.notification.websocket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.notification.dto.event.FloodLifecycleEvent;
+import org.project.floodalert.notification.dto.response.AdminAlertDTO;
 import org.project.floodalert.notification.dto.response.ProcessedSensorData;
 import org.project.floodalert.notification.dto.response.SensorTelemetryWsDTO;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -57,8 +58,9 @@ public class AdminSocketDispatcher {
     )
     public void onLifecycleAlert(FloodLifecycleEvent event, Acknowledgment acknowledgment) {
         try {
-            // Đẩy thẳng sự kiện cảnh báo xuống client đang subscribe /topic/admin/alerts
-            simpMessagingTemplate.convertAndSend(TOPIC_ALERTS, event);
+            AdminAlertDTO alertDTO = enrichEventForAdmin(event);
+            
+            simpMessagingTemplate.convertAndSend(TOPIC_ALERTS, alertDTO);
 
             log.debug("[ALERT] Đẩy WebSocket cảnh báo thành công eventId={}, type={}, location={}, severity={}",
                     event.getEventId(), event.getType(), event.getLocation(), event.getSeverityLevel());
@@ -70,5 +72,93 @@ public class AdminSocketDispatcher {
             log.error("[ALERT] Lỗi xử lý lifecycle event, bỏ qua: {}", e.getMessage(), e);
             acknowledgment.acknowledge();
         }
+    }
+
+    /**
+     * Enrich event với thông tin dễ hiểu cho admin dashboard
+     */
+    private AdminAlertDTO enrichEventForAdmin(FloodLifecycleEvent event) {
+        String eventType = event.getType();
+        String alertMessage = generateAlertMessage(eventType, event);
+        String alertLevel = determineAlertLevel(eventType, event.getSeverityLevel());
+        
+        return AdminAlertDTO.builder()
+                .eventId(event.getEventId())
+                .type(eventType)
+                .waterLevel(event.getWaterLevel())
+                .severityLevel(event.getSeverityLevel())
+                .location(event.getLocation())
+                .lat(event.getLat())
+                .lon(event.getLon())
+                .timestamp(event.getTimestamp())
+                .alertMessage(alertMessage)
+                .alertLevel(alertLevel)
+                .build();
+    }
+
+    private String generateAlertMessage(String eventType, FloodLifecycleEvent event) {
+        if (eventType == null) {
+            return String.format("Cập nhật tình trạng ngập tại %s", event.getLocation());
+        }
+        
+        return switch (eventType.toUpperCase()) {
+            case "CREATED" -> 
+                String.format("Phát hiện ngập mới tại %s - Mức độ: %s",
+                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
+            
+            case "ESCALATED" -> 
+                String.format("Mức độ ngập gia tăng tại %s - Hiện tại: %s",
+                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
+            
+            case "DE_ESCALATED" -> 
+                String.format("Mức độ ngập giảm tại %s - Hiện tại: %s",
+                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
+            
+            case "RESOLVED" -> 
+                String.format("Tình trạng ngập đã được giải quyết tại %s",
+                    event.getLocation());
+            
+            case "UPDATED" -> 
+                String.format("Cập nhật tình trạng ngập tại %s - Mức độ: %s",
+                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
+            
+            default -> 
+                String.format("Cập nhật tình trạng ngập tại %s", event.getLocation());
+        };
+    }
+
+    private String determineAlertLevel(String eventType, String severityLevel) {
+        if (eventType == null) {
+            return "INFO";
+        }
+        
+        return switch (eventType.toUpperCase()) {
+            case "CREATED" -> {
+                if ("CRITICAL".equalsIgnoreCase(severityLevel) || "HIGH".equalsIgnoreCase(severityLevel) 
+                        || "DANGER".equalsIgnoreCase(severityLevel)) {
+                    yield "CRITICAL";
+                }
+                yield "WARNING";
+            }
+            case "ESCALATED" -> "DANGER";
+            case "DE_ESCALATED" -> "SUCCESS";
+            case "RESOLVED" -> "SUCCESS";
+            case "UPDATED" -> "INFO";
+            default -> "INFO";
+        };
+    }
+
+    private String translateSeverity(String severityLevel) {
+        if (severityLevel == null) {
+            return "Không xác định";
+        }
+        
+        return switch (severityLevel.toUpperCase()) {
+            case "CRITICAL" -> "Cực kỳ nguy hiểm";
+            case "DANGER", "HIGH" -> "Nguy hiểm";
+            case "WARNING", "MEDIUM" -> "Cảnh báo";
+            case "LOW" -> "Thấp";
+            default -> severityLevel;
+        };
     }
 }

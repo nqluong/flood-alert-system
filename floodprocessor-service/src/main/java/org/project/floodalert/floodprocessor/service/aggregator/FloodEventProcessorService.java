@@ -12,7 +12,5 @@ import java.util.List;
  */
 public interface FloodEventProcessorService {
 
-    void process(ProcessedSensorData data);
-
     void processBatch(List<ProcessedSensorData> dataList);
 }
