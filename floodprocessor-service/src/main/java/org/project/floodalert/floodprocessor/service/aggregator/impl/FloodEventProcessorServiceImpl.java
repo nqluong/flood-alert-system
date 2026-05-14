@@ -83,12 +83,12 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
         return FloodLifecycleEvent.builder()
                 .eventId(floodEvent.getEventId())
                 .type(dbResult.lifecycleEventType())
-                .waterLevel(floodEvent.getWaterLevel() != null
-                        ? floodEvent.getWaterLevel().doubleValue() : null)
-                .severityLevel(floodEvent.getSeverityLevel())
+                // Dùng snapshot được capture tại thời điểm tạo result, tránh bị ghi đè bởi message kế tiếp trong batch
+                .waterLevel(dbResult.waterLevelSnapshot())
+                .severityLevel(dbResult.severityLevelSnapshot())
                 .location(floodEvent.getLocationDescription())
-                .lat(floodEvent.getLat() != null ? floodEvent.getLat().doubleValue() : null)
-                .lon(floodEvent.getLon() != null ? floodEvent.getLon().doubleValue() : null)
+                .lat(floodEvent.getLat())
+                .lon(floodEvent.getLon())
                 .timestamp(LocalDateTime.now())
                 .build();
     }

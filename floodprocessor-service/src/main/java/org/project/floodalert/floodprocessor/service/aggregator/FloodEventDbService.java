@@ -32,10 +32,12 @@ public interface FloodEventDbService {
     record FloodEventDbResult(
             FloodEvent floodEvent,
             LifecycleEventType lifecycleEventType,
-            boolean shouldPublish
+            boolean shouldPublish,
+            Double waterLevelSnapshot,
+            String severityLevelSnapshot
     ) {
         public static FloodEventDbResult noAction() {
-            return new FloodEventDbResult(null, null, false);
+            return new FloodEventDbResult(null, null, false, null, null);
         }
     }
 }

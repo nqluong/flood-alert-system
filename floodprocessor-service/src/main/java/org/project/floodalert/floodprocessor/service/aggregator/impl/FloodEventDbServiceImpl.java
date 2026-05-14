@@ -41,7 +41,6 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
 
         log.debug("Bắt đầu xử lý DB cho sensor [{}], trạng thái mới: {}", sensorId, newStatus);
 
-        // Tra cứu sự kiện đang Active của sensor này
         Optional<FloodEvent> activeEventOpt =
                 floodEventRepository.findActiveEventBySensorId(sensorId, LocalDateTime.now());
 
@@ -55,7 +54,6 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
             }
         };
 
-        // Back-link IoTReading nếu có FloodEvent được xử lý
         if (result.floodEvent() != null && data.getReadingId() != null) {
             backLinkIotReading(data.getReadingId(), result.floodEvent());
         }
@@ -79,20 +77,21 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
 
         // Lấy tất cả active events trong 1 query duy nhất
         List<FloodEvent> activeEvents = floodEventRepository.findActiveEventsBySensorIds(sensorIds, now);
-        
-        Map<String, FloodEvent> activeEventMap = activeEvents.stream()
+
+        Map<String, FloodEvent> activeEventMap = new HashMap<>(activeEvents.stream()
                 .collect(Collectors.toMap(
                         FloodEvent::getSourceId,
                         event -> event,
                         (existing, replacement) -> existing
-                ));
+                )));
 
-        log.debug("Batch query: Tìm thấy {} active events cho {} sensors", 
+        log.debug("Batch query: Tìm thấy {} active events cho {} sensors",
                 activeEventMap.size(), sensorIds.size());
 
         // Xử lý từng sensor data
         List<FloodEventDbResult> results = new ArrayList<>();
-        List<FloodEvent> eventsToSave = new ArrayList<>();
+        // Dùng LinkedHashMap để dedup event theo eventId, tránh save cùng entity nhiều lần
+        Map<String, FloodEvent> eventsToSaveByEventId = new LinkedHashMap<>();
         List<BackLinkTask> backLinkTasks = new ArrayList<>();
 
         for (ProcessedSensorData data : dataList) {
@@ -105,7 +104,7 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
                     case SAFE -> handleScenarioA(data, activeEventOpt);
                     case WARNING, DANGER -> handleScenarioBC(data, activeEventOpt, newStatus);
                     default -> {
-                        log.warn("Trạng thái không xác định [{}] cho sensor [{}], bỏ qua", 
+                        log.warn("Trạng thái không xác định [{}] cho sensor [{}], bỏ qua",
                                 newStatus, sensorId);
                         yield FloodEventDbResult.noAction();
                     }
@@ -113,24 +112,32 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
 
                 results.add(result);
 
+                // Cập nhật activeEventMap để các message kế tiếp của cùng sensor trong batch xử lý đúng kịch bản
+                if (result.lifecycleEventType() == LifecycleEventType.RESOLVED) {
+                    activeEventMap.remove(sensorId);
+                } else if (result.lifecycleEventType() == LifecycleEventType.CREATED
+                        && result.floodEvent() != null) {
+                    activeEventMap.put(sensorId, result.floodEvent());
+                }
+
                 if (result.floodEvent() != null) {
-                    eventsToSave.add(result.floodEvent());
-                    
+                    eventsToSaveByEventId.put(result.floodEvent().getEventId(), result.floodEvent());
+
                     if (data.getReadingId() != null) {
                         backLinkTasks.add(new BackLinkTask(data.getReadingId(), result.floodEvent()));
                     }
                 }
 
             } catch (Exception e) {
-                log.error("Lỗi xử lý sensor [{}] trong batch: {}", 
+                log.error("Lỗi xử lý sensor [{}] trong batch: {}",
                         data.getSensorId(), e.getMessage(), e);
                 results.add(FloodEventDbResult.noAction());
             }
         }
 
-        if (!eventsToSave.isEmpty()) {
-            floodEventRepository.saveAll(eventsToSave);
-            log.debug("Batch save: Lưu {} flood events", eventsToSave.size());
+        if (!eventsToSaveByEventId.isEmpty()) {
+            floodEventRepository.saveAll(eventsToSaveByEventId.values());
+            log.debug("Batch save: Lưu {} flood events", eventsToSaveByEventId.size());
         }
 
         if (!backLinkTasks.isEmpty()) {
@@ -157,10 +164,14 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
         log.debug("Kịch bản A – Nước rút: sensor [{}], sự kiện [{}] → RESOLVED",
                 data.getSensorId(), event.getEventId());
 
+        // Snapshot trước khi sửa status để tránh bị ghi đè bởi message kế tiếp trong cùng batch
+        Double wlSnapshot = event.getWaterLevel() != null ? event.getWaterLevel().doubleValue() : null;
+        String sevSnapshot = event.getSeverityLevel();
+
         event.setStatus("RESOLVED");
         event.setExpiresAt(LocalDateTime.now());
 
-        return new FloodEventDbResult(event, LifecycleEventType.RESOLVED, true);
+        return new FloodEventDbResult(event, LifecycleEventType.RESOLVED, true, wlSnapshot, sevSnapshot);
     }
 
     private FloodEventDbResult handleScenarioBC(ProcessedSensorData data,
@@ -199,7 +210,8 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
                 .expiresAt(now.plusMinutes(EVENT_TTL_MINUTES))
                 .build();
 
-        return new FloodEventDbResult(newEvent, LifecycleEventType.CREATED, true);
+        return new FloodEventDbResult(newEvent, LifecycleEventType.CREATED, true,
+                data.getWaterLevel(), newStatus.name());
     }
 
     /**
@@ -230,23 +242,27 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
 
         activeEvent.setExpiresAt(LocalDateTime.now().plusMinutes(EVENT_TTL_MINUTES));
 
+        // Snapshot sau khi update — được capture tại đây để tránh bị ghi đè bởi message kế tiếp
+        Double wlSnapshot = activeEvent.getWaterLevel() != null ? activeEvent.getWaterLevel().doubleValue() : null;
+        String sevSnapshot = activeEvent.getSeverityLevel();
+
         SeverityChange severityChange = detectSeverityChange(previousSeverity, newStatus);
-        
+
         return switch (severityChange) {
             case ESCALATED -> {
                 log.info("Mức độ ngập gia tăng: {} → {} cho sự kiện [{}]",
                         previousSeverity, newStatus, activeEvent.getEventId());
-                yield new FloodEventDbResult(activeEvent, LifecycleEventType.ESCALATED, true);
+                yield new FloodEventDbResult(activeEvent, LifecycleEventType.ESCALATED, true, wlSnapshot, sevSnapshot);
             }
             case DE_ESCALATED -> {
                 log.info("Mức độ ngập giảm: {} → {} cho sự kiện [{}]",
                         previousSeverity, newStatus, activeEvent.getEventId());
-                yield new FloodEventDbResult(activeEvent, LifecycleEventType.DE_ESCALATED, true);
+                yield new FloodEventDbResult(activeEvent, LifecycleEventType.DE_ESCALATED, true, wlSnapshot, sevSnapshot);
             }
             case NO_CHANGE -> {
                 log.debug("Sự kiện [{}] chỉ được gia hạn thời gian, không thay đổi severity",
                         activeEvent.getEventId());
-                yield new FloodEventDbResult(activeEvent, null, false);
+                yield new FloodEventDbResult(activeEvent, null, false, null, null);
             }
         };
     }
