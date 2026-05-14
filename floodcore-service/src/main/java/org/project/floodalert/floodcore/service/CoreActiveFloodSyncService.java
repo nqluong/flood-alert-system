@@ -41,11 +41,15 @@ public class CoreActiveFloodSyncService {
         }
 
         try {
-            if (LifecycleEventType.RESOLVED.equals(event.getType())) {
+            LifecycleEventType eventType = event.getType();
+            
+            if (LifecycleEventType.RESOLVED.equals(eventType)) {
                 handleResolved(event);
-            } else {
-                // CREATED hoặc ESCALATED
+            } else if (eventType != null) {
+                // CREATED, ESCALATED, DE_ESCALATED, UPDATED
                 handleUpsert(event);
+            } else {
+                log.warn("[FloodListener] Event type null, bỏ qua eventId={}", event.getEventId());
             }
 
             log.info("[FloodListener] Xử lý thành công eventId={}, type={}",

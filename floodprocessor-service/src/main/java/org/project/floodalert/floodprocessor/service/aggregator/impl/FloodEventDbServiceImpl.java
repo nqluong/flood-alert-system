@@ -217,11 +217,9 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
 
         log.debug("Kịch bản C – Ngập kéo dài: sensor [{}], sự kiện [{}]", sensorId, activeEvent.getEventId());
 
-        // Cập nhật water_level nếu mức mới cao hơn mức cũ
+        // Luôn cập nhật water_level theo giá trị mới nhất từ sensor
         BigDecimal newWaterLevel = toBigDecimal(data.getWaterLevel());
-        if (newWaterLevel != null
-                && (activeEvent.getWaterLevel() == null
-                    || newWaterLevel.compareTo(activeEvent.getWaterLevel()) > 0)) {
+        if (newWaterLevel != null) {
             log.debug("Cập nhật mức nước: {}cm → {}cm cho sự kiện [{}]",
                     activeEvent.getWaterLevel(), newWaterLevel, activeEvent.getEventId());
             activeEvent.setWaterLevel(newWaterLevel);

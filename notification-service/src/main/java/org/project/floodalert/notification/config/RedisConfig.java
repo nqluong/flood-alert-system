@@ -88,12 +88,14 @@ public class RedisConfig {
         GenericJackson2JsonRedisSerializer jsonSerializer =
                 new GenericJackson2JsonRedisSerializer(objectMapper);
         template.setValueSerializer(jsonSerializer);
+        
+        // ⭐ FIX: Dùng StringSerializer cho HASH values để đọc được data từ Auth service
         template.setHashValueSerializer(stringSerializer);
 
         template.setEnableTransactionSupport(false);
         template.afterPropertiesSet();
 
-        log.info("RedisTemplate configured successfully");
+        log.info("RedisTemplate configured successfully with String hash value serializer");
         return template;
     }
 

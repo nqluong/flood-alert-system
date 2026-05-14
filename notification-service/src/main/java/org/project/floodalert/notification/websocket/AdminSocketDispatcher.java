@@ -79,15 +79,16 @@ public class AdminSocketDispatcher {
      */
     private AdminAlertDTO enrichEventForAdmin(FloodLifecycleEvent event) {
         String eventType = event.getType();
-        String alertMessage = generateAlertMessage(eventType, event);
+        String location = resolveLocation(event);
+        String alertMessage = generateAlertMessage(eventType, event, location);
         String alertLevel = determineAlertLevel(eventType, event.getSeverityLevel());
-        
+
         return AdminAlertDTO.builder()
                 .eventId(event.getEventId())
                 .type(eventType)
                 .waterLevel(event.getWaterLevel())
                 .severityLevel(event.getSeverityLevel())
-                .location(event.getLocation())
+                .location(location)
                 .lat(event.getLat())
                 .lon(event.getLon())
                 .timestamp(event.getTimestamp())
@@ -96,34 +97,49 @@ public class AdminSocketDispatcher {
                 .build();
     }
 
-    private String generateAlertMessage(String eventType, FloodLifecycleEvent event) {
-        if (eventType == null) {
-            return String.format("Cập nhật tình trạng ngập tại %s", event.getLocation());
+    private String resolveLocation(FloodLifecycleEvent event) {
+        if (event.getLocation() != null && !event.getLocation().isBlank()) {
+            return event.getLocation();
         }
-        
+        // Fallback: lấy sensorId từ eventId (format: EV-yyyyMMdd-HHmmss-{sensorId})
+        String eventId = event.getEventId();
+        if (eventId != null && eventId.startsWith("EV-") && eventId.length() > 19) {
+            String sensorId = eventId.substring(19);
+            return "Sensor " + sensorId;
+        }
+        if (event.getLat() != null && event.getLon() != null) {
+            return String.format("Vị trí [%.4f, %.4f]", event.getLat(), event.getLon());
+        }
+        return "Không xác định";
+    }
+
+    private String generateAlertMessage(String eventType, FloodLifecycleEvent event, String location) {
+        if (eventType == null) {
+            return String.format("Cập nhật tình trạng ngập tại %s", location);
+        }
+
         return switch (eventType.toUpperCase()) {
-            case "CREATED" -> 
+            case "CREATED" ->
                 String.format("Phát hiện ngập mới tại %s - Mức độ: %s",
-                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
-            
-            case "ESCALATED" -> 
+                    location, translateSeverity(event.getSeverityLevel()));
+
+            case "ESCALATED" ->
                 String.format("Mức độ ngập gia tăng tại %s - Hiện tại: %s",
-                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
-            
-            case "DE_ESCALATED" -> 
+                    location, translateSeverity(event.getSeverityLevel()));
+
+            case "DE_ESCALATED" ->
                 String.format("Mức độ ngập giảm tại %s - Hiện tại: %s",
-                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
-            
-            case "RESOLVED" -> 
-                String.format("Tình trạng ngập đã được giải quyết tại %s",
-                    event.getLocation());
-            
-            case "UPDATED" -> 
+                    location, translateSeverity(event.getSeverityLevel()));
+
+            case "RESOLVED" ->
+                String.format("Tình trạng ngập đã được giải quyết tại %s", location);
+
+            case "UPDATED" ->
                 String.format("Cập nhật tình trạng ngập tại %s - Mức độ: %s",
-                    event.getLocation(), translateSeverity(event.getSeverityLevel()));
-            
-            default -> 
-                String.format("Cập nhật tình trạng ngập tại %s", event.getLocation());
+                    location, translateSeverity(event.getSeverityLevel()));
+
+            default ->
+                String.format("Cập nhật tình trạng ngập tại %s", location);
         };
     }
 

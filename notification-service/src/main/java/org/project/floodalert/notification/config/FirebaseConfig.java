@@ -5,9 +5,11 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -23,6 +25,9 @@ public class FirebaseConfig {
 
     @Value("${app.firebase.enabled:true}")
     private boolean firebaseEnabled;
+
+    @Autowired
+    private ResourceLoader resourceLoader;
 
     @PostConstruct
     public void initialize() {
@@ -59,7 +64,7 @@ public class FirebaseConfig {
 
     private InputStream loadServiceAccountFile() throws IOException {
         try {
-            ClassPathResource resource = new ClassPathResource(serviceAccountPath);
+            Resource resource = resourceLoader.getResource(serviceAccountPath);
             if (resource.exists()) {
                 log.info("Loading Firebase credentials from classpath: {}", serviceAccountPath);
                 return resource.getInputStream();

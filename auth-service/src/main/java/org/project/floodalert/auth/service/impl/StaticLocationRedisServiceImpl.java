@@ -136,7 +136,7 @@ public class StaticLocationRedisServiceImpl implements StaticLocationRedisServic
                     addressDetails.put("lon", address.getLon().toString());
                     
                     redisTemplate.opsForHash().putAll(hashKey, addressDetails);
-
+                    
                 } catch (Exception e) {
                     log.warn("Lỗi khi sync địa chỉ id={}: {}", address.getId(), e.getMessage());
                 }

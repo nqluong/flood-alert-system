@@ -192,6 +192,11 @@ public class NotificationAggregationService {
             for (GeoResult<RedisGeoCommands.GeoLocation<String>> result : results.getContent()) {
                 try {
                     String addressId = result.getContent().getName();
+                    
+                    if (addressId.startsWith("\"") && addressId.endsWith("\"")) {
+                        addressId = addressId.substring(1, addressId.length() - 1);
+                    }
+                    
                     Double distanceMeters = result.getDistance().getValue() * 1000;
                     
                     // Lấy chi tiết từ HASH
