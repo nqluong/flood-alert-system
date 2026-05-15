@@ -47,6 +47,15 @@ public class UserAddressController {
         return ResponseEntity.ok(ApiResponse.success("Địa chỉ đã được thêm thành công", response));
     }
 
+    @GetMapping("/current")
+    public ResponseEntity<ApiResponse<UserAddressResponse>> getPrimaryAddress(
+            Authentication authentication) {
+        InternalUserDetails userDetails = (InternalUserDetails) authentication.getPrincipal();
+        UUID userId = UUID.fromString(userDetails.getUserId());
+        UserAddressResponse response = userAddressService.getPrimaryAddress(userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
     @GetMapping("/{addressId}")
     public ResponseEntity<ApiResponse<UserAddressResponse>> getUserAddressById(
             @PathVariable("addressId") UUID addressId,

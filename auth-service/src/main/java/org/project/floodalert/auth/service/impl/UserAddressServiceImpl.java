@@ -49,6 +49,17 @@ public class UserAddressServiceImpl implements UserAddressService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public UserAddressResponse getPrimaryAddress(UUID userId) {
+        UserAddress address = userAddressRepository.findPrimaryByUserId(userId)
+                .orElseThrow(() -> new AppException(
+                        AuthErrorCode.ADDRESS_NOT_FOUND,
+                        "Người dùng với ID " + userId + " chưa có địa chỉ chính"
+                ));
+        return mapToAddressResponse(address);
+    }
+
+    @Override
     @Transactional
     public UserAddressResponse createAddress(UUID userId, UserAddressRequest addressRequest) {
         validateUserExists(userId);

@@ -11,6 +11,8 @@ public interface UserAddressService {
 
     UserAddressResponse getUserAddressById(UUID userId, UUID addressId);
 
+    UserAddressResponse getPrimaryAddress(UUID userId);
+
     UserAddressResponse createAddress(UUID userId, UserAddressRequest addressRequest);
 
     UserAddressResponse updateAddress(UUID userId, UUID addressId, UserAddressRequest addressRequest);

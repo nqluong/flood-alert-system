@@ -19,8 +19,6 @@ public class SensorHealthBatchListener {
     private final SensorBatchUpdateRepository sensorBatchUpdateRepository;
 
     /**
-     * Lắng nghe batch events từ topic sensor-health-sync.
-     *
      * @param events         lô {@link SensorHealthSyncEvent} nhận được từ Kafka
      * @param acknowledgment dùng để commit offset thủ công sau khi xử lý
      */
