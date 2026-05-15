@@ -65,19 +65,14 @@ public class GeoUtils {
     public static List<List<Double>> createSquarePolygon(double lat, double lon, double offset) {
         List<List<Double>> polygon = new ArrayList<>(5);
 
-        // Góc Tây Nam (SW)
         polygon.add(List.of(lon - offset, lat - offset));
 
-        // Góc Đông Nam (SE)
         polygon.add(List.of(lon + offset, lat - offset));
 
-        // Góc Đông Bắc (NE)
         polygon.add(List.of(lon + offset, lat + offset));
 
-        // Góc Tây Bắc (NW)
         polygon.add(List.of(lon - offset, lat + offset));
 
-        // Điểm đóng (trùng điểm đầu)
         polygon.add(List.of(lon - offset, lat - offset));
 
         return polygon;

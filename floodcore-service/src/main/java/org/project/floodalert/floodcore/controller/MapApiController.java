@@ -17,6 +17,7 @@ import org.project.floodalert.floodcore.service.UserReportService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -73,7 +74,7 @@ public class MapApiController {
     ) {
         log.info("[MapApiController] Nhận request tìm đường an toàn: ({},{}) -> ({},{}), vehicle={}",
                 startLat, startLon, endLat, endLon, vehicleType);
-
+        Instant startTime = Instant.now();
         SafeRouteRequest request = SafeRouteRequest.builder()
                 .startLat(startLat)
                 .startLon(startLon)
@@ -83,6 +84,8 @@ public class MapApiController {
                 .build();
 
         SafeRouteResponse response = safeRoutingService.findSafeRoute(request);
+        log.info("[MapApiController] Trả về route an toàn sau {}ms",
+                Instant.now().toEpochMilli() - startTime.toEpochMilli());
 
         return ResponseEntity.ok(ApiResponse.success(response));
     }
