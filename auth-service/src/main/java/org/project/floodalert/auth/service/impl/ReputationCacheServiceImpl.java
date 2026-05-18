@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.auth.config.RedisKeyProperties;
+import org.project.floodalert.auth.model.UserProfile;
 import org.project.floodalert.auth.repository.UserProfileRepository;
 import org.project.floodalert.auth.service.ReputationCacheService;
 import org.project.floodalert.common.exception.AppException;
@@ -12,6 +13,7 @@ import org.project.floodalert.common.exception.ErrorCode;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -68,6 +70,21 @@ public class ReputationCacheServiceImpl implements ReputationCacheService {
         }
 
         return score;
+    }
+
+    @Override
+    @Transactional
+    public void updateAndCache(UUID userId, int delta) {
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        int newScore = Math.max(0, profile.getReputationScore() + delta);
+        profile.setReputationScore(newScore);
+        userProfileRepository.save(profile);
+
+        log.info("Updated reputation in DB: userId={}, delta={}, newScore={}", userId, delta, newScore);
+
+        cacheAsync(userId, newScore);
     }
 
     private String buildKey(UUID userId) {

@@ -22,6 +22,15 @@ public class SharedRedisGeoService {
 
     private final RedisTemplate<String, Object> redisTemplate;
 
+    public void updateEventPosition(String eventId, double lat, double lon) {
+        try {
+            redisTemplate.opsForGeo().add(ACTIVE_FLOODS_GEO_KEY, new Point(lon, lat), eventId);
+            log.debug("[GEO-SERVICE] Cập nhật vị trí event: eventId={}, lat={}, lon={}", eventId, lat, lon);
+        } catch (Exception e) {
+            log.error("[GEO-SERVICE] Lỗi khi cập nhật vị trí event {}: {}", eventId, e.getMessage(), e);
+        }
+    }
+
     public Optional<String> findNearbyActiveFlood(double lat, double lon, double radiusKm) {
         log.debug("[GEO-SERVICE] GEOSEARCH active_floods_geo FROMLONLAT lon={} lat={} BYRADIUS {}km",
                 lon, lat, radiusKm);

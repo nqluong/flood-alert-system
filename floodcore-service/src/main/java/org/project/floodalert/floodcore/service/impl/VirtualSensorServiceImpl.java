@@ -35,8 +35,8 @@ public class VirtualSensorServiceImpl implements VirtualSensorService {
     private static final double LON_MIN = 105.7;
     private static final double LON_MAX = 105.9;
 
-    private static final BigDecimal WARNING_THRESHOLD = new BigDecimal("40.0");
-    private static final BigDecimal DANGER_THRESHOLD = new BigDecimal("80.0");
+    private static final BigDecimal WARNING_THRESHOLD = new BigDecimal("20.0");
+    private static final BigDecimal DANGER_THRESHOLD = new BigDecimal("30.0");
 
     @Override
     @Transactional

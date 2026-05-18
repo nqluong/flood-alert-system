@@ -204,6 +204,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                 // Cập nhật nhanh (không chấm điểm)
                 FloodEvent updatedEvent = persistenceService.handleFastUpdate(msg, existingEventId);
 
+                // Đồng bộ tâm vùng ngập mới lên Redis Geo Index
+                redisGeoService.updateEventPosition(updatedEvent.getEventId(), updatedEvent.getLat(), updatedEvent.getLon());
+
                 // GAMIFICATION: Scenario 4 - ACTIVE Confirmation (Té nước theo mưa)
                 log.info("[GAMIFICATION][SCENARIO-4] ACTIVE confirmation: userId={}, eventId={} → Reward {}",
                                 msg.getUserId(), existingEventId, POINTS_ACTIVE_CONFIRMATION);
@@ -255,6 +258,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
                 // Cập nhật Database (có thể PENDING->ACTIVE)
                 FloodEvent updatedEvent = persistenceService.handleClusterUpdate(msg, existingEventId, newScore);
+
+                // Đồng bộ tâm vùng ngập mới lên Redis Geo Index
+                redisGeoService.updateEventPosition(updatedEvent.getEventId(), updatedEvent.getLat(), updatedEvent.getLon());
 
                 // GAMIFICATION: Scenario 3 - PENDING -> ACTIVE Transition
                 if (STATUS_PENDING.equals(oldStatus) && STATUS_ACTIVE.equals(updatedEvent.getStatus())) {

@@ -16,6 +16,8 @@ import java.util.UUID;
 @Repository
 public interface FloodEventRepository extends JpaRepository<FloodEvent, UUID> {
 
+    Optional<FloodEvent> findByEventId(String eventId);
+
     /**
      * Tìm sự kiện ngập đang Active của một sensor cụ thể.
      * Điều kiện: nguồn = 'SENSOR', thuộc sensor đã cho, trạng thái PENDING hoặc CONFIRMED,

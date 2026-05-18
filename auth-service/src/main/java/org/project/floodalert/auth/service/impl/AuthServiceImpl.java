@@ -351,27 +351,7 @@ public class AuthServiceImpl implements AuthService {
             log.debug("Token invalidated - JTI: {}, Reason: {}", jti, reason);
         } catch (Exception e) {
             log.error("Error invalidating token", e);
-            // Don't throw exception, just log
         }
-    }
-
-    private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
-
-        if (ip == null || ip.isEmpty() || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getRemoteAddr();
-        }
-
-        // X-Forwarded-For can contain multiple IPs, get the first one
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
-        }
-
-        return ip;
     }
 
     private String determineFailureReason(BaseErrorCode errorCode) {

@@ -56,6 +56,10 @@ app:
   kafka:
     topic:
       fcm-token: ${KAFKA_FCM_TOKEN_TOPIC:fcm-token-events}
+      reputation: ${KAFKA_REPUTATION_TOPIC:reputation-update-events}
+    consumer:
+      reputation:
+        group-id: ${KAFKA_REPUTATION_GROUP_ID:auth-service-reputation-consumer}
 
 logging:
   level:

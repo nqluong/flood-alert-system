@@ -39,8 +39,6 @@ public class UserReportListener {
         } catch (Exception e) {
             log.error("[USER-REPORT-LISTENER] Lỗi khi xử lý reportId={}: {}",
                     event.getReportId(), e.getMessage(), e);
-            // Vẫn ack để tránh message bị xử lý lặp lại liên tục
-            // TODO: Cân nhắc DLQ (Dead Letter Queue) cho production
             acknowledgment.acknowledge();
         }
     }

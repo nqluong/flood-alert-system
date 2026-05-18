@@ -23,42 +23,6 @@ public class VirtualSensorController {
 
     private final VirtualSensorService virtualSensorService;
 
-    /**
-     * API Khởi tạo (Provisioning) Virtual Sensors
-     * 
-     * POST /api/v1/sensors/virtual/provision
-     * 
-     * Request Body:
-     * {
-     *   "target_count": 50
-     * }
-     * 
-     * Response:
-     * {
-     *   "success": true,
-     *   "code": 201,
-     *   "data": {
-     *     "total_count": 50,
-     *     "created_count": 20,
-     *     "existing_count": 30,
-     *     "sensors": [
-     *       {
-     *         "sensor_id": "VIRTUAL_0001",
-     *         "api_key": "uuid-string",
-     *         "lat": 21.0285,
-     *         "lon": 105.8542,
-     *         "name": "Virtual Sensor 1",
-     *         "status": "ACTIVE"
-     *       },
-     *       ...
-     *     ],
-     *     "message": "Đã tạo thêm 20 virtual sensors. Tổng cộng: 50 sensors"
-     *   }
-     * }
-     * 
-     * @param request Request chứa target_count
-     * @return Response chứa danh sách tất cả virtual sensors
-     */
     @PostMapping("/provision")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<VirtualSensorProvisionResponse>> provisionVirtualSensors(
@@ -78,28 +42,6 @@ public class VirtualSensorController {
                         .build());
     }
 
-    /**
-     * API Dọn dẹp (Cleanup) toàn bộ Virtual Sensors
-     * 
-     * Logic:
-     * 1. Tìm tất cả sensors có is_virtual = true
-     * 2. Xóa khỏi Redis trước (để Ingestion Service không nhận data)
-     * 3. Xóa khỏi PostgreSQL
-     * 
-     * DELETE /api/v1/sensors/virtual/clean
-     * 
-     * Response:
-     * {
-     *   "success": true,
-     *   "code": 200,
-     *   "data": {
-     *     "deleted_count": 50,
-     *     "message": "Đã xóa thành công 50 virtual sensors khỏi hệ thống"
-     *   }
-     * }
-     * 
-     * @return Response chứa số lượng đã xóa
-     */
     @DeleteMapping("/clean")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<VirtualSensorCleanupResponse>> cleanupVirtualSensors() {

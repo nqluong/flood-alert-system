@@ -19,7 +19,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 
@@ -32,8 +36,12 @@ public class NotificationEventConsumer {
     private final NotificationPreferenceRepository preferenceRepository;
     private final FcmDispatchService fcmDispatchService;
 
-    private static final double DEFAULT_RADIUS_METERS = 5000.0; // 5km default
+    private static final double DEFAULT_RADIUS_METERS = 5000.0;
     private static final int MAX_RETRIES = 3;
+
+    private static final String TYPE_RESOLVED = "RESOLVED";
+    private static final String NOTIFICATION_TYPE_FLOOD_ALERT = "FLOOD_ALERT";
+    private static final String NOTIFICATION_TYPE_FLOOD_RESOLVED = "FLOOD_RESOLVED";
 
     @KafkaListener(
             topics = "${app.kafka.topic.lifecycle-events}",
@@ -43,58 +51,47 @@ public class NotificationEventConsumer {
     @Transactional
     public void consumeFloodLifecycleEvent(FloodLifecycleEvent event, Acknowledgment ack) {
         try {
-            log.info("========== BẮT ĐẦU XỬ LÝ FLOOD LIFECYCLE EVENT ==========");
-            log.debug("Event ID: {}, Type: {}, Location: ({}, {}), Severity: {}",
-                    event.getEventId(), event.getType(), event.getLat(), event.getLon(), 
-                    event.getSeverityLevel());
+            boolean isResolved = TYPE_RESOLVED.equalsIgnoreCase(event.getType());
+            log.info("[NotifConsumer] Xử lý event eventId={}, type={}, severity={}, location=({},{})",
+                    event.getEventId(), event.getType(), event.getSeverityLevel(),
+                    event.getLat(), event.getLon());
 
-            FloodEventDTO floodEventDTO = convertToFloodEventDTO(event);
+            FloodEventDTO dto = convertToFloodEventDTO(event);
 
-            Map<UUID, NotificationContext> contexts = aggregationService.aggregateNotificationContexts(floodEventDTO);
-            
+            Map<UUID, NotificationContext> contexts =
+                    aggregationService.aggregateNotificationContexts(dto, !isResolved);
+
             if (contexts.isEmpty()) {
-                log.info("Không có user nào bị ảnh hưởng. Bỏ qua event.");
+                log.info("[NotifConsumer] Không có user bị ảnh hưởng, bỏ qua eventId={}", event.getEventId());
                 ack.acknowledge();
                 return;
             }
-            
-            log.debug("Tìm thấy {} users bị ảnh hưởng", contexts.size());
-            
-            Map<UUID, NotificationContext> filteredContexts = filterThroughPreferences(contexts);
-            
-            if (filteredContexts.isEmpty()) {
-                log.info("Không có user nào pass qua filter preferences. Bỏ qua event.");
+
+            Map<UUID, NotificationContext> filtered = filterThroughPreferences(contexts);
+            if (filtered.isEmpty()) {
+                log.info("[NotifConsumer] Không có user nào pass filter preferences, eventId={}", event.getEventId());
                 ack.acknowledge();
                 return;
             }
-            
-            log.debug("Sau khi filter: {} users sẽ nhận thông báo", filteredContexts.size());
-            List<Notification> notifications = generateNotifications(filteredContexts, floodEventDTO);
-            
-            log.debug("Đã tạo {} notifications", notifications.size());
-            
+
+            List<Notification> notifications = generateNotifications(filtered, dto, isResolved);
             int successCount = fcmDispatchService.sendBatch(notifications);
-            
-            log.info("========== KẾT THÚC XỬ LÝ FLOOD LIFECYCLE EVENT ==========");
-            log.info("Kết quả: {}/{} notifications gửi thành công", successCount, notifications.size());
-            
+
+            log.info("[NotifConsumer] Hoàn tất eventId={}: {}/{} notifications gửi thành công",
+                    event.getEventId(), successCount, notifications.size());
             ack.acknowledge();
 
         } catch (Exception e) {
-            log.error("Lỗi khi xử lý event: eventId={}", event.getEventId(), e);
-            // Không acknowledge để Kafka retry
+            log.error("[NotifConsumer] Lỗi khi xử lý event: eventId={}", event.getEventId(), e);
         }
     }
 
-    /**
-     * Chuyển đổi FloodLifecycleEvent (từ FloodProcessor) sang FloodEventDTO (internal format)
-     */
     private FloodEventDTO convertToFloodEventDTO(FloodLifecycleEvent event) {
         return FloodEventDTO.builder()
                 .eventId(event.getEventId())
                 .lat(event.getLat())
                 .lon(event.getLon())
-                .radiusMeters(DEFAULT_RADIUS_METERS) // Default 5km
+                .radiusMeters(DEFAULT_RADIUS_METERS)
                 .severityLevel(event.getSeverityLevel())
                 .waterLevel(event.getWaterLevel())
                 .location(event.getLocation())
@@ -103,130 +100,75 @@ public class NotificationEventConsumer {
     }
 
     /**
-     * Lọc users dựa trên preferences
-     * Kiểm tra: enabled, floodAlerts, preferPush, quietHours
+     * Filter users theo preferences: enabled, floodAlerts, preferPush, quietHours.
      */
-    private Map<UUID, NotificationContext> filterThroughPreferences(
-            Map<UUID, NotificationContext> contexts) {
-        
+    private Map<UUID, NotificationContext> filterThroughPreferences(Map<UUID, NotificationContext> contexts) {
         Set<UUID> userIds = contexts.keySet();
-        
-        // Fetch preferences một lần (batch query)
-        List<NotificationPreference> preferences = preferenceRepository.findAllById(userIds);
-        Map<UUID, NotificationPreference> preferenceMap = preferences.stream()
+        Map<UUID, NotificationPreference> preferenceMap = preferenceRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(NotificationPreference::getUserId, p -> p));
-        
-        log.debug("Fetched {} preferences cho {} users", preferenceMap.size(), userIds.size());
-        
-        // Filter
-        Map<UUID, NotificationContext> filtered = contexts.entrySet().stream()
-                .filter(entry -> {
-                    UUID userId = entry.getKey();
-                    NotificationPreference pref = preferenceMap.get(userId);
-                    
-                    // Nếu không có preference, áp dụng default (cho phép)
-                    if (pref == null) {
-                        log.debug("User {} không có preference, áp dụng default (allow)", userId);
-                        return true;
-                    }
-                    
-                    // Check enabled
-                    if (!Boolean.TRUE.equals(pref.getEnabled())) {
-                        log.debug("User {} bị block: enabled=false", userId);
-                        return false;
-                    }
-                    
-                    // Check floodAlerts
-                    if (!Boolean.TRUE.equals(pref.getFloodAlerts())) {
-                        log.debug("User {} bị block: floodAlerts=false", userId);
-                        return false;
-                    }
-                    
-                    // Check preferPush
-                    if (!Boolean.TRUE.equals(pref.getPreferPush())) {
-                        log.debug("User {} bị block: preferPush=false", userId);
-                        return false;
-                    }
-                    
-                    // Check quiet hours
-                    if (isInQuietHours(pref)) {
-                        log.debug("User {} bị block: đang trong quiet hours", userId);
-                        return false;
-                    }
-                    
-                    return true;
-                })
+
+        return contexts.entrySet().stream()
+                .filter(entry -> isAllowed(preferenceMap.get(entry.getKey())))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-        
-        log.debug("Filter hoàn tất: {}/{} users pass", filtered.size(), contexts.size());
-        
-        return filtered;
     }
 
-    /**
-     * Kiểm tra xem giờ hiện tại có nằm trong quiet hours không
-     */
-    private boolean isInQuietHours(NotificationPreference pref) {
-        if (!Boolean.TRUE.equals(pref.getQuietHoursEnabled())) {
+    private boolean isAllowed(NotificationPreference pref) {
+        if (pref == null) return true;
+
+        if (!Boolean.TRUE.equals(pref.getEnabled())
+                || !Boolean.TRUE.equals(pref.getFloodAlerts())
+                || !Boolean.TRUE.equals(pref.getPreferPush())) {
             return false;
         }
+        return !isInQuietHours(pref);
+    }
+
+    private boolean isInQuietHours(NotificationPreference pref) {
+        if (!Boolean.TRUE.equals(pref.getQuietHoursEnabled())) return false;
 
         LocalTime start = pref.getQuietHoursStart();
         LocalTime end = pref.getQuietHoursEnd();
-
-        if (start == null || end == null) {
-            return false;
-        }
+        if (start == null || end == null) return false;
 
         LocalTime now = LocalTime.now();
-
-        if (start.isBefore(end)) {
-            // Normal case: 08:00 - 22:00
-            return now.isAfter(start) && now.isBefore(end);
-        } else {
-            // Across midnight: 22:00 - 08:00
-            return now.isAfter(start) || now.isBefore(end);
-        }
+        return start.isBefore(end)
+                ? (now.isAfter(start) && now.isBefore(end))
+                : (now.isAfter(start) || now.isBefore(end));
     }
 
-    /**
-     * Sinh danh sách Notification từ contexts
-     * Sử dụng context-based messaging (nội dung khác nhau tùy vào active/static)
-     */
-    private List<Notification> generateNotifications(
-            Map<UUID, NotificationContext> contexts,
-            FloodEventDTO event) {
-        
+    private List<Notification> generateNotifications(Map<UUID, NotificationContext> contexts,
+                                                     FloodEventDTO event,
+                                                     boolean isResolved) {
         return contexts.values().stream()
-                .map(context -> {
-                    String title = aggregationService.generateNotificationTitle(context);
-                    String body = aggregationService.generateNotificationBody(context, event);
-                    Map<String, Object> data = buildNotificationData(event, context);
-                    
-                    return Notification.builder()
-                            .userId(context.getUserId())
-                            .title(title)
-                            .body(body)
-                            .notificationType("FLOOD_ALERT")
-                            .priority(determinePriority(event.getSeverityLevel()))
-                            .data(data)
-                            .channel(NotificationChannel.PUSH)
-                            .fcmToken(null)
-                            .status(NotificationStatus.PENDING)
-                            .retryCount(0)
-                            .maxRetries(MAX_RETRIES)
-                            .build();
-                })
+                .map(context -> buildNotification(context, event, isResolved))
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Build data payload cho notification
-     */
-    private Map<String, Object> buildNotificationData(FloodEventDTO event, NotificationContext context) {
+    private Notification buildNotification(NotificationContext context, FloodEventDTO event, boolean isResolved) {
+        String title = isResolved
+                ? aggregationService.generateResolvedTitle()
+                : aggregationService.generateNotificationTitle(context);
+        String body = isResolved
+                ? aggregationService.generateResolvedBody(context, event)
+                : aggregationService.generateNotificationBody(context, event);
+
+        return Notification.builder()
+                .userId(context.getUserId())
+                .title(title)
+                .body(body)
+                .notificationType(isResolved ? NOTIFICATION_TYPE_FLOOD_RESOLVED : NOTIFICATION_TYPE_FLOOD_ALERT)
+                .priority(isResolved ? NotificationPriority.NORMAL : determinePriority(event.getSeverityLevel()))
+                .data(buildNotificationData(event, context, isResolved))
+                .channel(NotificationChannel.PUSH)
+                .fcmToken(null)
+                .status(NotificationStatus.PENDING)
+                .retryCount(0)
+                .maxRetries(MAX_RETRIES)
+                .build();
+    }
+
+    private Map<String, Object> buildNotificationData(FloodEventDTO event, NotificationContext context, boolean isResolved) {
         Map<String, Object> data = new HashMap<>();
-        
-        // Event info
         data.put("eventId", event.getEventId());
         data.put("lat", event.getLat());
         data.put("lon", event.getLon());
@@ -234,29 +176,18 @@ public class NotificationEventConsumer {
         data.put("waterLevel", event.getWaterLevel());
         data.put("location", event.getLocation());
         data.put("timestamp", event.getTimestamp().toString());
-        
+        data.put("isResolved", isResolved);
         data.put("isNearActive", context.isNearActive());
-        // zoneName đã sạch từ HASH, không cần extract
         data.put("affectedZones", String.join(", ", context.getAffectedZones()));
-        
-        if (context.getActiveDistance() != null) {
-            data.put("activeDistance", context.getActiveDistance());
-        }
-        if (context.getStaticDistance() != null) {
-            data.put("staticDistance", context.getStaticDistance());
-        }
-        
+
+        if (context.getActiveDistance() != null) data.put("activeDistance", context.getActiveDistance());
+        if (context.getStaticDistance() != null) data.put("staticDistance", context.getStaticDistance());
+
         return data;
     }
-    
-    /**
-     * Chuyển đổi mức độ ngập từ tiếng Anh sang tiếng Việt
-     */
+
     private String translateSeverityToVietnamese(String severityLevel) {
-        if (severityLevel == null) {
-            return "Không xác định";
-        }
-        
+        if (severityLevel == null) return "Không xác định";
         return switch (severityLevel.toUpperCase()) {
             case "CRITICAL" -> "Cực kỳ nguy hiểm";
             case "DANGER", "HIGH" -> "Nguy hiểm";
@@ -267,10 +198,7 @@ public class NotificationEventConsumer {
     }
 
     private NotificationPriority determinePriority(String severityLevel) {
-        if (severityLevel == null) {
-            return NotificationPriority.NORMAL;
-        }
-
+        if (severityLevel == null) return NotificationPriority.NORMAL;
         return switch (severityLevel.toUpperCase()) {
             case "CRITICAL", "HIGH", "DANGER" -> NotificationPriority.HIGH;
             case "MEDIUM", "WARNING" -> NotificationPriority.NORMAL;

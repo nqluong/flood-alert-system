@@ -86,18 +86,28 @@ public class FloodEventPersistenceService {
                 msg.getReportId(), existingEventId, newRecalculatedScore, msg.getLat(), msg.getLon());
 
         try {
-            // Tìm FloodEvent theo eventId
-            FloodEvent existingEvent = floodEventRepository.findAll().stream()
-                    .filter(e -> e.getEventId().equals(existingEventId))
-                    .findFirst()
+            FloodEvent existingEvent = floodEventRepository.findByEventId(existingEventId)
                     .orElseThrow(() -> new AppException(
                             ProcessorErrorCode.FLOOD_EVENT_NOT_FOUND,
                             "FloodEvent not found with eventId: " + existingEventId
                     ));
 
-            // Cập nhật vote_count
-            int newVoteCount = existingEvent.getVoteCount() + 1;
+            // Cập nhật tâm vùng ngập theo weighted centroid trước khi tăng vote_count
+            int oldVoteCount = existingEvent.getVoteCount();
+            double oldLat = existingEvent.getLat();
+            double oldLon = existingEvent.getLon();
+            double newLat = (oldLat * oldVoteCount + msg.getLat()) / (oldVoteCount + 1);
+            double newLon = (oldLon * oldVoteCount + msg.getLon()) / (oldVoteCount + 1);
+            existingEvent.setLat(newLat);
+            existingEvent.setLon(newLon);
+
+            int newVoteCount = oldVoteCount + 1;
             existingEvent.setVoteCount(newVoteCount);
+
+            log.info("[PERSISTENCE][CENTROID] PENDING event centroid updated: eventId={}, ({},{}) → ({},{})",
+                    existingEventId,
+                    String.format("%.6f", oldLat), String.format("%.6f", oldLon),
+                    String.format("%.6f", newLat), String.format("%.6f", newLon));
 
             // Cập nhật confidence_score
             BigDecimal newConfidenceScore = BigDecimal.valueOf(newRecalculatedScore)
@@ -210,9 +220,7 @@ public class FloodEventPersistenceService {
     }
 
     public String getEventStatus(String eventId) {
-        FloodEvent event = floodEventRepository.findAll().stream()
-                .filter(e -> e.getEventId().equals(eventId))
-                .findFirst()
+        FloodEvent event = floodEventRepository.findByEventId(eventId)
                 .orElseThrow(() -> new AppException(
                         ProcessorErrorCode.FLOOD_EVENT_NOT_FOUND,
                         "FloodEvent not found with eventId: " + eventId
@@ -237,17 +245,26 @@ public class FloodEventPersistenceService {
                 msg.getReportId(), existingEventId);
 
         try {
-            // Tìm FloodEvent
-            FloodEvent existingEvent = floodEventRepository.findAll().stream()
-                    .filter(e -> e.getEventId().equals(existingEventId))
-                    .findFirst()
+            FloodEvent existingEvent = floodEventRepository.findByEventId(existingEventId)
                     .orElseThrow(() -> new AppException(
                             ProcessorErrorCode.FLOOD_EVENT_NOT_FOUND,
                             "FloodEvent not found with eventId: " + existingEventId
                     ));
 
-            // Chỉ tăng vote_count (không thay đổi confidence_score)
-            existingEvent.setVoteCount(existingEvent.getVoteCount() + 1);
+            // Cập nhật tâm vùng ngập theo weighted centroid trước khi tăng vote_count
+            int oldVoteCount = existingEvent.getVoteCount();
+            double oldLat = existingEvent.getLat();
+            double oldLon = existingEvent.getLon();
+            double newLat = (oldLat * oldVoteCount + msg.getLat()) / (oldVoteCount + 1);
+            double newLon = (oldLon * oldVoteCount + msg.getLon()) / (oldVoteCount + 1);
+            existingEvent.setLat(newLat);
+            existingEvent.setLon(newLon);
+            existingEvent.setVoteCount(oldVoteCount + 1);
+
+            log.info("[PERSISTENCE][CENTROID] ACTIVE event centroid updated: eventId={}, ({},{}) → ({},{})",
+                    existingEventId,
+                    String.format("%.6f", oldLat), String.format("%.6f", oldLon),
+                    String.format("%.6f", newLat), String.format("%.6f", newLon));
 
             // AUTO-INSERT EventContributor: VERIFIER (xác nhận cho event ACTIVE)
             createContributor(existingEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER);

@@ -13,10 +13,6 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
-/**
- * Engine chấm điểm báo cáo sử dụng nhiều strategy song song trên virtual threads.
- * Trả về ScoringResult chứa tổng điểm và các điểm thành phần.
- */
 @Slf4j
 @Component
 public class ReportScoringEngine {
@@ -30,12 +26,6 @@ public class ReportScoringEngine {
         this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
-    /**
-     * Chấm điểm báo cáo sử dụng tất cả các strategy áp dụng được.
-     *
-     * @param msg Thông tin báo cáo
-     * @return ScoringResult chứa tổng điểm và các điểm thành phần
-     */
     public ScoringResult evaluateScore(ReportMessage msg) {
         boolean hasImage = msg.getImageUrl() != null && !msg.getImageUrl().isEmpty();
 

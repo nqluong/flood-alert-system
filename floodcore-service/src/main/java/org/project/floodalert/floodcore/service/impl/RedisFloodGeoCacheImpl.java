@@ -94,7 +94,7 @@ public class RedisFloodGeoCacheImpl implements FloodGeoCache {
             String geoKey = redisKeyProperties.getKeys().getFlood().getGeoIndex();
 
             Circle searchArea = new Circle(
-                    new Point(lon, lat),   // Redis GEO: lon trước, lat sau
+                    new Point(lon, lat),
                     new Distance(radiusKm, RedisGeoCommands.DistanceUnit.KILOMETERS)
             );
 
