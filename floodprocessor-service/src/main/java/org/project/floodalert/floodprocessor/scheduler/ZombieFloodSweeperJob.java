@@ -29,7 +29,7 @@ public class ZombieFloodSweeperJob {
     public void sweepZombieFloodEvents() {
         long timeout = configService.getSensorTimeoutMs();
         long currentTime = System.currentTimeMillis();
-        log.info("Bắt đầu quét các sự kiện ngập zombie với timeout {} ms", timeout);
+        log.debug("Bắt đầu quét các sự kiện ngập zombie với timeout {} ms", timeout);
 
         List<FloodEvent> ongoingEvents = floodEventRepository.findActiveIotEvents();
         for (FloodEvent event : ongoingEvents) {

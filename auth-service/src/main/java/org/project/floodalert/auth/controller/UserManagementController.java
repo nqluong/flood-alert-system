@@ -15,6 +15,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/users")
@@ -74,5 +76,15 @@ public class UserManagementController {
         return ResponseEntity.ok(
                 ApiResponse.success("Tìm kiếm người dùng thành công", response)
         );
+    }
+
+    @PostMapping("/batch-names")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getUserNamesByIds(
+            @RequestBody List<String> userIds
+    ) {
+        List<UUID> uuids = userIds.stream().map(UUID::fromString).toList();
+        Map<String, String> names = userManagementService.getUserNamesByIds(uuids);
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách tên người dùng thành công", names));
     }
 }

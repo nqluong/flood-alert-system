@@ -10,16 +10,14 @@ import org.mockito.Captor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.project.floodalert.notification.dto.UserGeoDTO;
 import org.project.floodalert.notification.dto.event.FloodLifecycleEvent;
-import org.project.floodalert.notification.enums.NotificationChannel;
 import org.project.floodalert.notification.enums.NotificationPriority;
-import org.project.floodalert.notification.enums.NotificationStatus;
 import org.project.floodalert.notification.model.Notification;
+import org.project.floodalert.notification.model.NotificationContext;
 import org.project.floodalert.notification.model.NotificationPreference;
 import org.project.floodalert.notification.repository.NotificationPreferenceRepository;
-import org.project.floodalert.notification.repository.NotificationRepository;
-import org.project.floodalert.notification.service.RedisGeoService;
+import org.project.floodalert.notification.service.FcmDispatchService;
+import org.project.floodalert.notification.service.NotificationAggregationService;
 import org.springframework.kafka.support.Acknowledgment;
 
 import java.time.LocalDateTime;
@@ -27,46 +25,32 @@ import java.time.LocalTime;
 import java.util.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class NotificationEventConsumerTest {
 
-    @Mock
-    private RedisGeoService redisGeoService;
-
-    @Mock
-    private NotificationPreferenceRepository preferenceRepository;
-
-    @Mock
-    private NotificationRepository notificationRepository;
-
-    @Mock
-    private Acknowledgment acknowledgment;
+    @Mock private NotificationAggregationService aggregationService;
+    @Mock private NotificationPreferenceRepository preferenceRepository;
+    @Mock private FcmDispatchService fcmDispatchService;
+    @Mock private Acknowledgment acknowledgment;
 
     @InjectMocks
     private NotificationEventConsumer consumer;
 
-    @Captor
-    private ArgumentCaptor<List<Notification>> notificationCaptor;
+    private static final UUID USER_ID = UUID.randomUUID();
 
     private FloodLifecycleEvent testEvent;
-    private UUID userId1;
-    private UUID userId2;
-    private UUID userId3;
 
     @BeforeEach
     void setUp() {
-        userId1 = UUID.randomUUID();
-        userId2 = UUID.randomUUID();
-        userId3 = UUID.randomUUID();
-
         testEvent = FloodLifecycleEvent.builder()
                 .eventId("event-123")
                 .type("FLOOD_DETECTED")
-                .waterLevel(1.5)
-                .severityLevel("HIGH")
+                .waterLevel(25.0)
+                .severityLevel("DANGER")
                 .location("Test Location")
                 .lat(10.762622)
                 .lon(106.660172)
@@ -74,334 +58,348 @@ class NotificationEventConsumerTest {
                 .build();
     }
 
-    @Nested
-    @DisplayName("consumeFloodLifecycleEvent Tests")
-    class ConsumeFloodLifecycleEventTests {
+    // ── Helpers ──────────────────────────────────────────────────────────────
 
-        @Test
-        @DisplayName("Should acknowledge and skip when no users found in radar")
-        void shouldSkipWhenNoUsersInRadar() {
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(Collections.emptyList());
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(redisGeoService).findUsersNear(testEvent.getLat(), testEvent.getLon(), 5.0);
-            verify(preferenceRepository, never()).findAllById(any());
-            verify(notificationRepository, never()).saveAll(any());
-            verify(acknowledgment).acknowledge();
-        }
-
-        @Test
-        @DisplayName("Should acknowledge and skip when all users filtered out")
-        void shouldSkipWhenAllUsersFilteredOut() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            NotificationPreference pref = NotificationPreference.builder()
-                    .userId(userId1)
-                    .enabled(false)
-                    .build();
-            when(preferenceRepository.findAllById(anySet())).thenReturn(List.of(pref));
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository, never()).saveAll(any());
-            verify(acknowledgment).acknowledge();
-        }
-
-        @Test
-        @DisplayName("Should save notifications for valid users and acknowledge")
-        void shouldSaveNotificationsForValidUsers() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build(),
-                    UserGeoDTO.builder().userId(userId2).distance(400.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            List<NotificationPreference> prefs = List.of(
-                    createValidPreference(userId1, 500),
-                    createValidPreference(userId2, 500)
-            );
-            when(preferenceRepository.findAllById(anySet())).thenReturn(prefs);
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            List<Notification> savedNotifications = notificationCaptor.getValue();
-
-            assertThat(savedNotifications).hasSize(2);
-            assertThat(savedNotifications).allMatch(n -> n.getStatus() == NotificationStatus.PENDING);
-            assertThat(savedNotifications).allMatch(n -> n.getChannel() == NotificationChannel.PUSH);
-            verify(acknowledgment).acknowledge();
-        }
-    }
-
-    @Nested
-    @DisplayName("Filter Through Funnel Tests")
-    class FilterThroughFunnelTests {
-
-        @Test
-        @DisplayName("Should allow user with default preference when distance <= 500m")
-        void shouldAllowUserWithDefaultPreferenceWhenNearby() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-            when(preferenceRepository.findAllById(anySet())).thenReturn(Collections.emptyList());
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            assertThat(notificationCaptor.getValue()).hasSize(1);
-        }
-
-        @Test
-        @DisplayName("Should block user with default preference when distance > 500m")
-        void shouldBlockUserWithDefaultPreferenceWhenFar() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(600.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-            when(preferenceRepository.findAllById(anySet())).thenReturn(Collections.emptyList());
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository, never()).saveAll(any());
-        }
-
-        @Test
-        @DisplayName("Should block user when enabled=false")
-        void shouldBlockUserWhenDisabled() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            NotificationPreference pref = NotificationPreference.builder()
-                    .userId(userId1)
-                    .enabled(false)
-                    .floodAlerts(true)
-                    .preferPush(true)
-                    .alertRadiusMeters(500)
-                    .build();
-            when(preferenceRepository.findAllById(anySet())).thenReturn(List.of(pref));
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository, never()).saveAll(any());
-        }
-
-        @Test
-        @DisplayName("Should block user when floodAlerts=false")
-        void shouldBlockUserWhenFloodAlertsDisabled() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            NotificationPreference pref = NotificationPreference.builder()
-                    .userId(userId1)
-                    .enabled(true)
-                    .floodAlerts(false)
-                    .preferPush(true)
-                    .alertRadiusMeters(500)
-                    .build();
-            when(preferenceRepository.findAllById(anySet())).thenReturn(List.of(pref));
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository, never()).saveAll(any());
-        }
-
-        @Test
-        @DisplayName("Should block user when preferPush=false")
-        void shouldBlockUserWhenPreferPushDisabled() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            NotificationPreference pref = NotificationPreference.builder()
-                    .userId(userId1)
-                    .enabled(true)
-                    .floodAlerts(true)
-                    .preferPush(false)
-                    .alertRadiusMeters(500)
-                    .build();
-            when(preferenceRepository.findAllById(anySet())).thenReturn(List.of(pref));
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository, never()).saveAll(any());
-        }
-
-        @Test
-        @DisplayName("Should block user when distance > alertRadiusMeters")
-        void shouldBlockUserWhenOutsideAlertRadius() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(600.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            NotificationPreference pref = createValidPreference(userId1, 500);
-            when(preferenceRepository.findAllById(anySet())).thenReturn(List.of(pref));
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository, never()).saveAll(any());
-        }
-
-        @Test
-        @DisplayName("Should filter mixed users correctly")
-        void shouldFilterMixedUsersCorrectly() {
-            List<UserGeoDTO> nearbyUsers = List.of(
-                    UserGeoDTO.builder().userId(userId1).distance(300.0).build(),
-                    UserGeoDTO.builder().userId(userId2).distance(300.0).build(),
-                    UserGeoDTO.builder().userId(userId3).distance(300.0).build()
-            );
-            when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                    .thenReturn(nearbyUsers);
-
-            List<NotificationPreference> prefs = List.of(
-                    createValidPreference(userId1, 500),
-                    NotificationPreference.builder().userId(userId2).enabled(false).build(),
-                    createValidPreference(userId3, 500)
-            );
-            when(preferenceRepository.findAllById(anySet())).thenReturn(prefs);
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            assertThat(notificationCaptor.getValue()).hasSize(2);
-            assertThat(notificationCaptor.getValue()).extracting(Notification::getUserId)
-                    .containsExactlyInAnyOrder(userId1, userId3);
-        }
-    }
-
-    @Nested
-    @DisplayName("Notification Priority Tests")
-    class NotificationPriorityTests {
-
-        @Test
-        @DisplayName("Should set HIGH priority for CRITICAL severity")
-        void shouldSetHighPriorityForCritical() {
-            testEvent.setSeverityLevel("CRITICAL");
-            setupValidUserScenario();
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            assertThat(notificationCaptor.getValue().get(0).getPriority())
-                    .isEqualTo(NotificationPriority.HIGH);
-        }
-
-        @Test
-        @DisplayName("Should set NORMAL priority for MEDIUM severity")
-        void shouldSetNormalPriorityForMedium() {
-            testEvent.setSeverityLevel("MEDIUM");
-            setupValidUserScenario();
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            assertThat(notificationCaptor.getValue().get(0).getPriority())
-                    .isEqualTo(NotificationPriority.NORMAL);
-        }
-
-        @Test
-        @DisplayName("Should set LOW priority for unknown severity")
-        void shouldSetLowPriorityForUnknown() {
-            testEvent.setSeverityLevel("UNKNOWN");
-            setupValidUserScenario();
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            assertThat(notificationCaptor.getValue().get(0).getPriority())
-                    .isEqualTo(NotificationPriority.LOW);
-        }
-
-        @Test
-        @DisplayName("Should set NORMAL priority for null severity")
-        void shouldSetNormalPriorityForNull() {
-            testEvent.setSeverityLevel(null);
-            setupValidUserScenario();
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            assertThat(notificationCaptor.getValue().get(0).getPriority())
-                    .isEqualTo(NotificationPriority.NORMAL);
-        }
-    }
-
-    @Nested
-    @DisplayName("Notification Content Tests")
-    class NotificationContentTests {
-
-        @Test
-        @DisplayName("Should build notification with correct content")
-        void shouldBuildNotificationWithCorrectContent() {
-            setupValidUserScenario();
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            Notification notification = notificationCaptor.getValue().get(0);
-
-            assertThat(notification.getTitle()).isEqualTo("Cảnh báo ngập lụt");
-            assertThat(notification.getBody()).contains("300");
-            assertThat(notification.getNotificationType()).isEqualTo("FLOOD_ALERT");
-            assertThat(notification.getFcmToken()).isNull();
-        }
-
-        @Test
-        @DisplayName("Should build notification data map correctly")
-        void shouldBuildNotificationDataCorrectly() {
-            setupValidUserScenario();
-
-            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
-
-            verify(notificationRepository).saveAll(notificationCaptor.capture());
-            Map<String, Object> data = notificationCaptor.getValue().get(0).getData();
-
-            assertThat(data).containsEntry("eventId", testEvent.getEventId());
-            assertThat(data).containsEntry("type", testEvent.getType());
-            assertThat(data).containsEntry("waterLevel", testEvent.getWaterLevel());
-            assertThat(data).containsKey("timestamp");
-        }
-    }
-
-    private NotificationPreference createValidPreference(UUID userId, int alertRadius) {
-        return NotificationPreference.builder()
+    private NotificationContext contextFor(UUID userId) {
+        return NotificationContext.builder()
                 .userId(userId)
-                .enabled(true)
-                .floodAlerts(true)
-                .preferPush(true)
-                .alertRadiusMeters(alertRadius)
-                .quietHoursEnabled(false)
+                .isNearActive(true)
+                .activeDistance(300.0)
                 .build();
     }
 
-    private void setupValidUserScenario() {
-        List<UserGeoDTO> nearbyUsers = List.of(
-                UserGeoDTO.builder().userId(userId1).distance(300.0).build()
-        );
-        when(redisGeoService.findUsersNear(anyDouble(), anyDouble(), anyDouble()))
-                .thenReturn(nearbyUsers);
+    private NotificationPreference prefWith(UUID userId, boolean enabled, boolean floodAlerts, boolean preferPush) {
+        return NotificationPreference.builder()
+                .userId(userId)
+                .enabled(enabled)
+                .floodAlerts(floodAlerts)
+                .preferPush(preferPush)
+                .quietHoursEnabled(false)
+                .alertRadiusMeters(500)
+                .build();
+    }
 
-        NotificationPreference pref = createValidPreference(userId1, 500);
-        when(preferenceRepository.findAllById(anySet())).thenReturn(List.of(pref));
+    private void stubAggregation(UUID... userIds) {
+        Map<UUID, NotificationContext> ctx = new LinkedHashMap<>();
+        for (UUID id : userIds) ctx.put(id, contextFor(id));
+        when(aggregationService.aggregateNotificationContexts(any(), anyBoolean())).thenReturn(ctx);
+        when(aggregationService.generateNotificationTitle(any())).thenReturn("Ngập lụt gần vị trí của bạn");
+        when(aggregationService.generateNotificationBody(any(), any())).thenReturn("Có điểm ngập cách 300m (mức độ: Nguy hiểm)");
+    }
+
+    // ── Tests ─────────────────────────────────────────────────────────────────
+
+    @Nested
+    @DisplayName("Event Processing Flow")
+    class EventFlowTests {
+
+        @Test
+        @DisplayName("Skip khi aggregation không tìm thấy user nào")
+        void skipWhenNoAggregatedContexts() {
+            when(aggregationService.aggregateNotificationContexts(any(), anyBoolean()))
+                    .thenReturn(Collections.emptyMap());
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(preferenceRepository, never()).findAllById(any());
+            verify(fcmDispatchService, never()).sendBatch(any());
+            verify(acknowledgment).acknowledge();
+        }
+
+        @Test
+        @DisplayName("Skip khi tất cả user bị lọc bởi preferences")
+        void skipWhenAllUsersFiltered() {
+            stubAggregation(USER_ID);
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, false, true, true)));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+            verify(acknowledgment).acknowledge();
+        }
+
+        @Test
+        @DisplayName("Gửi notification cho user hợp lệ và acknowledge")
+        void sendNotificationsForValidUsers() {
+            stubAggregation(USER_ID);
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, true, true)));
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService).sendBatch(any());
+            verify(acknowledgment).acknowledge();
+        }
+
+        @Test
+        @DisplayName("User không có record preference → được phép nhận (default allow)")
+        void allowUserWithNoPreferenceRecord() {
+            stubAggregation(USER_ID);
+            when(preferenceRepository.findAllById(any())).thenReturn(Collections.emptyList());
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService).sendBatch(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Preference Filter Logic")
+    class PreferenceFilterTests {
+
+        @BeforeEach
+        void setupContext() {
+            stubAggregation(USER_ID);
+        }
+
+        @Test
+        @DisplayName("Block khi enabled=false")
+        void blockWhenDisabled() {
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, false, true, true)));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Block khi preferPush=false")
+        void blockWhenPreferPushFalse() {
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, true, false)));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Block khi floodAlerts=false (severeOnly) + severity LOW")
+        void blockWhenSevereOnlyAndLow() {
+            testEvent.setSeverityLevel("LOW");
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, false, true)));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Block khi floodAlerts=false (severeOnly) + severity MEDIUM")
+        void blockWhenSevereOnlyAndMedium() {
+            testEvent.setSeverityLevel("MEDIUM");
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, false, true)));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Block khi floodAlerts=false (severeOnly) + severity WARNING (IoT)")
+        void blockWhenSevereOnlyAndWarning() {
+            testEvent.setSeverityLevel("WARNING");
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, false, true)));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Allow khi floodAlerts=false (severeOnly) + severity DANGER")
+        void allowWhenSevereOnlyAndDanger() {
+            testEvent.setSeverityLevel("DANGER");
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, false, true)));
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Allow khi floodAlerts=false (severeOnly) + severity CRITICAL")
+        void allowWhenSevereOnlyAndCritical() {
+            testEvent.setSeverityLevel("CRITICAL");
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, false, true)));
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Block khi đang trong quiet hours")
+        void blockWhenInQuietHours() {
+            LocalTime now = LocalTime.now();
+            NotificationPreference pref = NotificationPreference.builder()
+                    .userId(USER_ID)
+                    .enabled(true).floodAlerts(true).preferPush(true)
+                    .quietHoursEnabled(true)
+                    .quietHoursStart(now.minusHours(1))
+                    .quietHoursEnd(now.plusHours(1))
+                    .build();
+            when(preferenceRepository.findAllById(any())).thenReturn(List.of(pref));
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService, never()).sendBatch(any());
+        }
+
+        @Test
+        @DisplayName("Filter đúng khi có nhiều user với preferences khác nhau")
+        void filterMixedUsersCorrectly() {
+            UUID user2 = UUID.randomUUID();
+            UUID user3 = UUID.randomUUID();
+            stubAggregation(USER_ID, user2, user3);
+
+            List<NotificationPreference> prefs = List.of(
+                    prefWith(USER_ID, true, true, true),       // allowed
+                    prefWith(user2, false, true, true),         // blocked (disabled)
+                    prefWith(user3, true, true, true)           // allowed
+            );
+            when(preferenceRepository.findAllById(any())).thenReturn(prefs);
+            when(fcmDispatchService.sendBatch(any())).thenReturn(2);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<Notification>> captor = ArgumentCaptor.forClass(List.class);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue()).hasSize(2);
+            assertThat(captor.getValue())
+                    .extracting(Notification::getUserId)
+                    .containsExactlyInAnyOrder(USER_ID, user3);
+        }
+    }
+
+    @Nested
+    @DisplayName("Notification Priority")
+    class PriorityTests {
+
+        @Captor
+        ArgumentCaptor<List<Notification>> captor;
+
+        @BeforeEach
+        void setupContext() {
+            stubAggregation(USER_ID);
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, true, true)));
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+        }
+
+        @Test
+        @DisplayName("CRITICAL → HIGH priority")
+        void criticalIsHighPriority() {
+            testEvent.setSeverityLevel("CRITICAL");
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.HIGH);
+        }
+
+        @Test
+        @DisplayName("DANGER → HIGH priority")
+        void dangerIsHighPriority() {
+            testEvent.setSeverityLevel("DANGER");
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.HIGH);
+        }
+
+        @Test
+        @DisplayName("MEDIUM → NORMAL priority")
+        void mediumIsNormalPriority() {
+            testEvent.setSeverityLevel("MEDIUM");
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.NORMAL);
+        }
+
+        @Test
+        @DisplayName("WARNING (IoT FloodStatus) → NORMAL priority")
+        void warningIsNormalPriority() {
+            testEvent.setSeverityLevel("WARNING");
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.NORMAL);
+        }
+
+        @Test
+        @DisplayName("LOW → LOW priority")
+        void lowIsLowPriority() {
+            testEvent.setSeverityLevel("LOW");
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.LOW);
+        }
+
+        @Test
+        @DisplayName("null severity → NORMAL priority")
+        void nullSeverityIsNormalPriority() {
+            testEvent.setSeverityLevel(null);
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.NORMAL);
+        }
+    }
+
+    @Nested
+    @DisplayName("Notification Content")
+    class ContentTests {
+
+        @Captor
+        ArgumentCaptor<List<Notification>> captor;
+
+        @Test
+        @DisplayName("Notification có đúng type, status, channel và data payload")
+        void notificationHasCorrectStructure() {
+            stubAggregation(USER_ID);
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, true, true)));
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            Notification n = captor.getValue().get(0);
+
+            assertThat(n.getNotificationType()).isEqualTo("FLOOD_ALERT");
+            assertThat(n.getUserId()).isEqualTo(USER_ID);
+            assertThat(n.getData()).containsKey("eventId");
+            assertThat(n.getData()).containsKey("lat");
+            assertThat(n.getData()).containsKey("lon");
+            assertThat(n.getData()).containsKey("waterLevel");
+            assertThat(n.getData()).containsKey("severityLevel");
+        }
+
+        @Test
+        @DisplayName("RESOLVED event → type FLOOD_RESOLVED và title đúng")
+        void resolvedEventHasCorrectType() {
+            testEvent.setType("RESOLVED");
+            stubAggregation(USER_ID);
+            when(aggregationService.generateResolvedTitle()).thenReturn("Khu vực đã hết ngập");
+            when(aggregationService.generateResolvedBody(any(), any())).thenReturn("Bạn có thể di chuyển bình thường.");
+            when(preferenceRepository.findAllById(any()))
+                    .thenReturn(List.of(prefWith(USER_ID, true, true, true)));
+            when(fcmDispatchService.sendBatch(any())).thenReturn(1);
+
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            Notification n = captor.getValue().get(0);
+            assertThat(n.getNotificationType()).isEqualTo("FLOOD_RESOLVED");
+            assertThat(n.getTitle()).isEqualTo("Khu vực đã hết ngập");
+        }
     }
 }

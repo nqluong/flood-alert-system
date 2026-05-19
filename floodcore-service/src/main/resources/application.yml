@@ -26,10 +26,10 @@ spring:
       timeout: 5000
       lettuce:
         pool:
-            max-active: 8
-            max-idle: 8
-            min-idle: 0
-            max-wait: -1ms
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
   config:

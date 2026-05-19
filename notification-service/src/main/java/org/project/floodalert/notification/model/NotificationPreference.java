@@ -54,7 +54,7 @@ public class NotificationPreference {
 
     @Column(name = "alert_radius_meters")
     @Builder.Default
-    Integer alertRadiusMeters = 500;
+    Integer alertRadiusMeters = 5000;
 
     @Column(name = "prefer_push")
     @Builder.Default

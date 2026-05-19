@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.function.Function;
 
 @Slf4j
 @Service
@@ -86,6 +87,23 @@ public class UserManagementServiceImpl implements UserManagementService {
                 userPage.getTotalElements(),
                 userPage.getTotalPages()
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Map<String, String> getUserNamesByIds(List<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) return Map.of();
+
+        Map<UUID, UserProfile> profileMap = userProfileRepository.findByUserIdIn(userIds).stream()
+                .collect(Collectors.toMap(UserProfile::getUserId, Function.identity()));
+
+        return userIds.stream().collect(Collectors.toMap(
+                UUID::toString,
+                id -> {
+                    UserProfile profile = profileMap.get(id);
+                    return (profile != null && profile.getFullName() != null) ? profile.getFullName() : "";
+                }
+        ));
     }
 
     private UserListResponse mapToUserListResponse(User user, UserProfile profile, List<String> roles) {

@@ -59,7 +59,7 @@ public class ActiveLocationScanner {
                 return Collections.emptyMap();
             }
 
-            // Bước 1: Parse GEO result thành Map<userId, distance>, dùng LinkedHashMap giữ thứ tự
+            // Parse GEO result thành Map<userId, distance>, dùng LinkedHashMap giữ thứ tự
             Map<UUID, Double> userDistances = results.getContent().stream()
                     .map(this::tryParseGeoResult)
                     .filter(Objects::nonNull)
@@ -71,7 +71,7 @@ public class ActiveLocationScanner {
 
             if (userDistances.isEmpty()) return Collections.emptyMap();
 
-            // Bước 2: Multi-GET heartbeat (1 roundtrip cho N keys)
+            // Multi-GET heartbeat (1 roundtrip cho N keys)
             List<UUID> orderedUserIds = List.copyOf(userDistances.keySet());
             List<String> heartbeatKeys = orderedUserIds.stream()
                     .map(id -> USER_HEARTBEAT_PREFIX + id)
@@ -80,7 +80,7 @@ public class ActiveLocationScanner {
 
             if (heartbeats == null) return Collections.emptyMap();
 
-            // Bước 3: Ghép heartbeat với userDistances, lọc user có heartbeat hợp lệ
+            // Ghép heartbeat với userDistances, lọc user có heartbeat hợp lệ
             return IntStream.range(0, orderedUserIds.size())
                     .filter(i -> heartbeats.get(i) != null)
                     .boxed()

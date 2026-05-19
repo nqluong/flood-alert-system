@@ -26,7 +26,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
-
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -36,18 +35,15 @@ public class NotificationEventConsumer {
     private final NotificationPreferenceRepository preferenceRepository;
     private final FcmDispatchService fcmDispatchService;
 
-    private static final double DEFAULT_RADIUS_METERS = 5000.0;
+    // Scan toàn bộ trong 10km (max frontend slider), filter per-user sau theo alertRadiusMeters
+    private static final double MAX_SCAN_RADIUS_METERS = 10_000.0;
     private static final int MAX_RETRIES = 3;
 
     private static final String TYPE_RESOLVED = "RESOLVED";
     private static final String NOTIFICATION_TYPE_FLOOD_ALERT = "FLOOD_ALERT";
     private static final String NOTIFICATION_TYPE_FLOOD_RESOLVED = "FLOOD_RESOLVED";
 
-    @KafkaListener(
-            topics = "${app.kafka.topic.lifecycle-events}",
-            groupId = "notification-push-group",
-            containerFactory = "lifecycleKafkaListenerContainerFactory"
-    )
+    @KafkaListener(topics = "${app.kafka.topic.lifecycle-events}", groupId = "notification-push-group", containerFactory = "lifecycleKafkaListenerContainerFactory")
     @Transactional
     public void consumeFloodLifecycleEvent(FloodLifecycleEvent event, Acknowledgment ack) {
         try {
@@ -58,8 +54,8 @@ public class NotificationEventConsumer {
 
             FloodEventDTO dto = convertToFloodEventDTO(event);
 
-            Map<UUID, NotificationContext> contexts =
-                    aggregationService.aggregateNotificationContexts(dto, !isResolved);
+            Map<UUID, NotificationContext> contexts = aggregationService.aggregateNotificationContexts(dto,
+                    !isResolved);
 
             if (contexts.isEmpty()) {
                 log.info("[NotifConsumer] Không có user bị ảnh hưởng, bỏ qua eventId={}", event.getEventId());
@@ -67,7 +63,7 @@ public class NotificationEventConsumer {
                 return;
             }
 
-            Map<UUID, NotificationContext> filtered = filterThroughPreferences(contexts);
+            Map<UUID, NotificationContext> filtered = filterThroughPreferences(contexts, event.getSeverityLevel());
             if (filtered.isEmpty()) {
                 log.info("[NotifConsumer] Không có user nào pass filter preferences, eventId={}", event.getEventId());
                 ack.acknowledge();
@@ -91,7 +87,7 @@ public class NotificationEventConsumer {
                 .eventId(event.getEventId())
                 .lat(event.getLat())
                 .lon(event.getLon())
-                .radiusMeters(DEFAULT_RADIUS_METERS)
+                .radiusMeters(MAX_SCAN_RADIUS_METERS)
                 .severityLevel(event.getSeverityLevel())
                 .waterLevel(event.getWaterLevel())
                 .location(event.getLocation())
@@ -100,35 +96,71 @@ public class NotificationEventConsumer {
     }
 
     /**
-     * Filter users theo preferences: enabled, floodAlerts, preferPush, quietHours.
+     * Filter users theo preferences: enabled, floodAlerts (severeOnly mode),
+     * preferPush, quietHours.
      */
-    private Map<UUID, NotificationContext> filterThroughPreferences(Map<UUID, NotificationContext> contexts) {
+    private Map<UUID, NotificationContext> filterThroughPreferences(Map<UUID, NotificationContext> contexts,
+            String severityLevel) {
         Set<UUID> userIds = contexts.keySet();
         Map<UUID, NotificationPreference> preferenceMap = preferenceRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(NotificationPreference::getUserId, p -> p));
 
         return contexts.entrySet().stream()
-                .filter(entry -> isAllowed(preferenceMap.get(entry.getKey())))
+                .filter(entry -> isAllowed(preferenceMap.get(entry.getKey()), severityLevel, entry.getValue()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
-    private boolean isAllowed(NotificationPreference pref) {
+    private boolean isAllowed(NotificationPreference pref, String severityLevel, NotificationContext context) {
         if (pref == null) return true;
 
         if (!Boolean.TRUE.equals(pref.getEnabled())
-                || !Boolean.TRUE.equals(pref.getFloodAlerts())
                 || !Boolean.TRUE.equals(pref.getPreferPush())) {
             return false;
         }
+
+        // floodAlerts=false → chế độ "chỉ báo động ngập sâu": chỉ cho qua MEDIUM trở lên
+        if (!Boolean.TRUE.equals(pref.getFloodAlerts()) && !isMediumOrAbove(severityLevel)) {
+            return false;
+        }
+
+        if (!isWithinUserRadius(pref, context)) {
+            return false;
+        }
+
         return !isInQuietHours(pref);
     }
 
+    private boolean isWithinUserRadius(NotificationPreference pref, NotificationContext context) {
+        if (pref.getAlertRadiusMeters() == null) return true;
+        double radiusMeters = pref.getAlertRadiusMeters();
+
+        if (context.isNearActive() && context.getActiveDistance() != null
+                && context.getActiveDistance() <= radiusMeters) {
+            return true;
+        }
+        if (context.getStaticDistance() != null && context.getStaticDistance() <= radiusMeters) {
+            return true;
+        }
+        return false;
+    }
+
+    private boolean isMediumOrAbove(String severityLevel) {
+        if (severityLevel == null)
+            return false;
+        return switch (severityLevel.toUpperCase()) {
+            case "MEDIUM", "WARNING", "DANGER", "CRITICAL" -> true;
+            default -> false;
+        };
+    }
+
     private boolean isInQuietHours(NotificationPreference pref) {
-        if (!Boolean.TRUE.equals(pref.getQuietHoursEnabled())) return false;
+        if (!Boolean.TRUE.equals(pref.getQuietHoursEnabled()))
+            return false;
 
         LocalTime start = pref.getQuietHoursStart();
         LocalTime end = pref.getQuietHoursEnd();
-        if (start == null || end == null) return false;
+        if (start == null || end == null)
+            return false;
 
         LocalTime now = LocalTime.now();
         return start.isBefore(end)
@@ -137,8 +169,8 @@ public class NotificationEventConsumer {
     }
 
     private List<Notification> generateNotifications(Map<UUID, NotificationContext> contexts,
-                                                     FloodEventDTO event,
-                                                     boolean isResolved) {
+            FloodEventDTO event,
+            boolean isResolved) {
         return contexts.values().stream()
                 .map(context -> buildNotification(context, event, isResolved))
                 .collect(Collectors.toList());
@@ -167,7 +199,8 @@ public class NotificationEventConsumer {
                 .build();
     }
 
-    private Map<String, Object> buildNotificationData(FloodEventDTO event, NotificationContext context, boolean isResolved) {
+    private Map<String, Object> buildNotificationData(FloodEventDTO event, NotificationContext context,
+            boolean isResolved) {
         Map<String, Object> data = new HashMap<>();
         data.put("eventId", event.getEventId());
         data.put("lat", event.getLat());
@@ -180,28 +213,34 @@ public class NotificationEventConsumer {
         data.put("isNearActive", context.isNearActive());
         data.put("affectedZones", String.join(", ", context.getAffectedZones()));
 
-        if (context.getActiveDistance() != null) data.put("activeDistance", context.getActiveDistance());
-        if (context.getStaticDistance() != null) data.put("staticDistance", context.getStaticDistance());
+        if (context.getActiveDistance() != null)
+            data.put("activeDistance", context.getActiveDistance());
+        if (context.getStaticDistance() != null)
+            data.put("staticDistance", context.getStaticDistance());
 
         return data;
     }
 
     private String translateSeverityToVietnamese(String severityLevel) {
-        if (severityLevel == null) return "Không xác định";
+        if (severityLevel == null)
+            return "Không xác định";
         return switch (severityLevel.toUpperCase()) {
-            case "CRITICAL" -> "Cực kỳ nguy hiểm";
-            case "DANGER", "HIGH" -> "Nguy hiểm";
-            case "WARNING", "MEDIUM" -> "Cảnh báo";
-            case "LOW" -> "Thấp";
+            case "CRITICAL" -> "Cực kỳ nguy hiểm (>50cm)";
+            case "DANGER" -> "Nguy hiểm (20–50cm)";
+            case "WARNING" -> "Cảnh báo";
+            case "MEDIUM" -> "Trung bình (10–20cm)";
+            case "LOW" -> "Nhẹ (5–10cm)";
+            case "NONE", "SAFE" -> "Không ngập";
             default -> severityLevel;
         };
     }
 
     private NotificationPriority determinePriority(String severityLevel) {
-        if (severityLevel == null) return NotificationPriority.NORMAL;
+        if (severityLevel == null)
+            return NotificationPriority.NORMAL;
         return switch (severityLevel.toUpperCase()) {
-            case "CRITICAL", "HIGH", "DANGER" -> NotificationPriority.HIGH;
-            case "MEDIUM", "WARNING" -> NotificationPriority.NORMAL;
+            case "CRITICAL", "DANGER" -> NotificationPriority.HIGH;
+            case "WARNING", "MEDIUM" -> NotificationPriority.NORMAL;
             default -> NotificationPriority.LOW;
         };
     }

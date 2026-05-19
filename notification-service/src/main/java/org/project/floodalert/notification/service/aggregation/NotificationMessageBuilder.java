@@ -47,11 +47,13 @@ public class NotificationMessageBuilder {
     public String translateSeverity(String severityLevel) {
         if (severityLevel == null) return "Không xác định";
         return switch (severityLevel.toUpperCase()) {
-            case "CRITICAL" -> "Cực kỳ nguy hiểm";
-            case "DANGER", "HIGH" -> "Nguy hiểm";
-            case "WARNING", "MEDIUM" -> "Cảnh báo";
-            case "LOW" -> "Thấp";
-            default -> severityLevel;
+            case "CRITICAL"         -> "Cực kỳ nguy hiểm";
+            case "DANGER"           -> "Nguy hiểm";
+            case "WARNING"          -> "Cảnh báo";
+            case "MEDIUM"           -> "Trung bình";
+            case "LOW"              -> "Nhẹ";
+            case "NONE", "SAFE"     -> "Không ngập";
+            default                 -> severityLevel;
         };
     }
 }

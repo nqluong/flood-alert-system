@@ -27,11 +27,11 @@ public class UserReportCleanupJob {
 
     @Scheduled(fixedDelay = 600000)
     public void applyTimeDecayAndSpatialCheck() {
-        log.info("=== Bắt đầu Job: Lão hóa & Kiểm tra chéo không gian ===");
+        log.info("Bắt đầu Job: Lão hóa & Kiểm tra chéo không gian");
         
         try {
             userReportProcessorService.applyTimeDecayAndSpatialCheck();
-            log.info("=== Hoàn thành Job: Lão hóa & Kiểm tra chéo không gian ===");
+            log.info("Hoàn thành Job: Lão hóa & Kiểm tra chéo không gian");
         } catch (Exception e) {
             log.error("Lỗi khi thực thi Job lão hóa và kiểm tra chéo", e);
         }

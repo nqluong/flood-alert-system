@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.exception.AppException;
+import org.slf4j.LoggerFactory;
 import org.project.floodalert.floodcore.config.OrsProperties;
 import org.project.floodalert.floodcore.dto.ors.OrsRequest;
 import org.project.floodalert.floodcore.dto.request.SafeRouteRequest;
@@ -27,15 +28,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrsRouteClient {
 
+    private static final org.slf4j.Logger GEOJSON_LOG = LoggerFactory.getLogger("geojson.ors.response");
     private static final List<String> MOTORBIKE_AVOID_FEATURES = List.of("highways", "tollways");
 
     private final OrsProperties orsProperties;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    /**
-     * Gọi ORS API – thống nhất cho cả có và không có avoid_polygons.
-     */
     public String call(SafeRouteRequest request, List<List<List<Double>>> avoidPolygons) {
         OrsRequest orsRequest = buildOrsRequest(request, avoidPolygons);
         logPayloadIfDebug(orsRequest);
@@ -48,11 +47,11 @@ public class OrsRouteClient {
                     orsProperties.getApiUrl(),
                     HttpMethod.POST,
                     entity,
-                    String.class
-            );
+                    String.class);
 
             if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
                 log.info("[SafeRouting] ORS API trả về thành công");
+                GEOJSON_LOG.info("{}", response.getBody());
                 return response.getBody();
             }
 
@@ -86,8 +85,7 @@ public class OrsRouteClient {
         return OrsRequest.builder()
                 .coordinates(List.of(
                         List.of(request.getStartLon(), request.getStartLat()),
-                        List.of(request.getEndLon(), request.getEndLat())
-                ))
+                        List.of(request.getEndLon(), request.getEndLat())))
                 .options(options)
                 .build();
     }
@@ -123,7 +121,8 @@ public class OrsRouteClient {
     }
 
     private void logPayloadIfDebug(OrsRequest orsRequest) {
-        if (!log.isDebugEnabled()) return;
+        if (!log.isDebugEnabled())
+            return;
         try {
             log.debug("[SafeRouting] ORS payload:\n{}",
                     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(orsRequest));

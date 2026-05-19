@@ -307,10 +307,10 @@ public class GeminiWebClientImpl implements GeminiApiClient {
 
         String dynamicPrompt = String.format("""
                 Analyze the attached image and cross-reference it with the user's report.
-                - Claimed Severity Level by User: %s (Scale: LOW = ankle deep, MEDIUM = knee deep, HIGH = above knee, CRITICAL = catastrophic)
+                - Claimed Severity Level by User: %s (Scale: LOW = shin deep 5–10cm, MEDIUM = knee deep 10–20cm, DANGER = waist deep 20–50cm, CRITICAL = catastrophic >50cm)
                 - User's Description: "%s"
-                
-                PENALIZE FAKES: If the user claims HIGH/CRITICAL but the image shows a dry street, indoor setting, or a puddle, you MUST give a confidence_score of 0.
+
+                PENALIZE FAKES: If the user claims DANGER/CRITICAL but the image shows a dry street, indoor setting, or a puddle, you MUST give a confidence_score of 0.
                 """, safeSeverity, safeDescription);
 
         Map<String, Object> textPart = Map.of("text", dynamicPrompt);
