@@ -134,6 +134,7 @@ public class StaticLocationRedisServiceImpl implements StaticLocationRedisServic
                     addressDetails.put("zoneName", zoneName);
                     addressDetails.put("lat", address.getLat().toString());
                     addressDetails.put("lon", address.getLon().toString());
+                    syncCount++;
                     
                     redisTemplate.opsForHash().putAll(hashKey, addressDetails);
                     

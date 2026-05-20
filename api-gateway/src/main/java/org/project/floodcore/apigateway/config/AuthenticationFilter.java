@@ -1,6 +1,7 @@
 package org.project.floodcore.apigateway.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodcore.apigateway.dto.response.ApiResponse;
@@ -36,6 +37,15 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
     @Value("${app.services.auth.url}")
     private String AUTH_SERVICE_URL;
 
+    @PostConstruct
+    public void logConfiguration() {
+        log.info("=== AuthenticationFilter Configuration ===");
+        log.info("Auth service URL: {}", AUTH_SERVICE_URL);
+        log.info("Public paths (no auth required): {}", PUBLIC_PATHS);
+        log.info("WebSocket paths (no auth required): {}", WEBSOCKET_PATHS);
+        log.info("==========================================");
+    }
+
     private static final List<String> PUBLIC_PATHS = List.of(
             "/flood-alert/api/v1/auth/login",
             "/flood-alert/api/v1/auth/social",
@@ -53,33 +63,32 @@ public class AuthenticationFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getPath().value();
         HttpMethod method = exchange.getRequest().getMethod();
 
-        log.debug("Request: {} {}", method, path);
+        log.info("[GW] {} {}", method, path);
 
         // Bỏ qua xác thực cho preflight OPTIONS request (CORS)
         if (exchange.getRequest().getMethod() == HttpMethod.OPTIONS) {
-            log.debug("Bypassing OPTIONS request for path: {}", path);
+            log.info("[GW] PASS OPTIONS (preflight) -> {}", path);
             return chain.filter(exchange);
         }
 
         // Bỏ qua xác thực cho WebSocket endpoints
         if (isWebSocketPath(path)) {
-            log.info("Bypassing authentication for WebSocket path: {}", path);
+            log.info("[GW] PASS WebSocket -> {}", path);
             return chain.filter(exchange);
         }
 
         // Bỏ qua xác thực cho public endpoints
         if (isPublicPath(path)) {
-            log.info("Bypassing authentication for public path: {}", path);
+            log.info("[GW] PASS public -> {}", path);
             return chain.filter(exchange);
         }
+
+        log.info("[GW] AUTH required -> {}", path);
 
         String token = extractToken(exchange.getRequest());
         if (token == null) {
             return unauthorized(exchange.getResponse(), "Thiếu token xác thực");
         }
-        // onErrorResume chỉ bao quanh bước gọi auth-service để verify token,
-        // KHÔNG bao chain.filter() — lỗi downstream (service tắt, timeout...) sẽ
-        // propagate lên GlobalExceptionHandler thay vì bị nuốt ở đây.
         return verifyTokenWithAuthService(token)
                 .onErrorResume(error -> {
                     log.error("Error verifying token with auth-service: {}", error.getMessage());

@@ -21,7 +21,7 @@ import reactor.core.publisher.Mono;
 import java.net.ConnectException;
 
 @Slf4j
-@Order(-2) // Higher priority than DefaultErrorWebExceptionHandler (order -1)
+@Order(-2)
 @Component
 @RequiredArgsConstructor
 public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
@@ -54,7 +54,6 @@ public class GlobalExceptionHandler implements ErrorWebExceptionHandler {
         } else if (ex instanceof ResponseStatusException rse) {
             status = HttpStatus.valueOf(rse.getStatusCode().value());
             message = rse.getReason() != null ? rse.getReason() : rse.getMessage();
-            log.warn("ResponseStatusException for path [{}]: {}", path, message);
         } else {
             status = HttpStatus.INTERNAL_SERVER_ERROR;
             message = "Đã xảy ra lỗi nội bộ tại cổng API";

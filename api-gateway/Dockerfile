@@ -4,6 +4,12 @@ WORKDIR /app
 
 COPY pom.xml .
 COPY api-gateway/pom.xml api-gateway/
+COPY common-service/pom.xml common-service/
+COPY auth-service/pom.xml auth-service/
+COPY notification-service/pom.xml notification-service/
+COPY ingestion-service/pom.xml ingestion-service/
+COPY floodcore-service/pom.xml floodcore-service/
+COPY floodprocessor-service/pom.xml floodprocessor-service/
 
 RUN mvn dependency:go-offline -pl api-gateway || true
 
@@ -24,9 +30,6 @@ RUN chown -R spring:spring /app
 USER spring:spring
 
 EXPOSE 8080
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
 
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+UseG1GC"
 

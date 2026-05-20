@@ -1,12 +1,205 @@
 version: "3.8"
 
 services:
-  ingestion-service:
-    image: nqluong14/ingestion-service:v1.0
-    container_name: ingestion-service
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: flood-nginx
     restart: unless-stopped
     ports:
-      - "8082:8082"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certbot/conf:/etc/letsencrypt:ro
+      - ./nginx/certbot/www:/var/www/certbot:ro
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - flood-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: flood-certbot
+    volumes:
+      - ./nginx/certbot/conf:/etc/letsencrypt
+      - ./nginx/certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --quiet; sleep 12h & wait $${!}; done;'"
+    depends_on:
+      - nginx
+    networks:
+      - flood-network
+
+  api-gateway:
+    image: nqluong14/api-gateway:v1.0
+    container_name: api-gateway
+    restart: unless-stopped
+    env_file:
+      - ./api-gateway/.env
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    networks:
+      - flood-network
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      floodcore-service:
+        condition: service_healthy
+      notification-service:
+        condition: service_healthy
+      ingestion-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+        reservations:
+          cpus: '0.2'
+          memory: 384M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  auth-service:
+    image: nqluong14/auth-service:v1.2
+    container_name: auth-service
+    restart: unless-stopped
+    # ports:
+    #   - "8081:8081"
+    env_file:
+      - ./auth-service/.env
+    volumes:
+      - ./secrets/firebase-key.json:/app/secrets/firebase-key.json:ro
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - FIREBASE_CONFIG_PATH=file:/app/secrets/firebase-key.json
+    networks:
+      - flood-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8081/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 768M
+        reservations:
+          cpus: '0.1'
+          memory: 384M
+
+  floodcore-service:
+    image: nqluong14/floodcore-service:v1.1
+    container_name: floodcore-service
+    restart: unless-stopped
+    # ports:
+    #   - "8083:8083"
+    env_file:
+      - ./floodcore-service/.env
+    volumes:
+      - ./secrets/firebase-key.json:/app/secrets/firebase-key.json:ro
+      - ./logs/floodcore:/app/logs
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - FIREBASE_CONFIG_PATH=file:/app/secrets/firebase-key.json
+    networks:
+      - flood-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8083/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.2'
+          memory: 768M
+
+  floodprocessor-service:
+    image: nqluong14/floodprocessor-service:v1.1
+    container_name: floodprocessor-service
+    restart: unless-stopped
+    # ports:
+    #   - "8084:8084"
+    env_file:
+      - ./floodprocessor-service/.env
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+    networks:
+      - flood-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 3072M
+        reservations:
+          cpus: '0.5'
+          memory: 1024M
+
+  notification-service:
+    image: nqluong14/notification-service:v1.2
+    container_name: notification-service
+    restart: unless-stopped
+    # ports:
+    #   - "8085:8085"
+    env_file:
+      - ./notification-service/.env
+    volumes:
+      - ./secrets/firebase-key.json:/app/secrets/firebase-key.json:ro
+    environment:
+      - TZ=Asia/Ho_Chi_Minh
+      - FIREBASE_CONFIG_PATH=file:/app/secrets/firebase-key.json
+    networks:
+      - flood-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8085/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+        reservations:
+          cpus: '0.2'
+          memory: 512M
+
+  ingestion-service:
+    image: nqluong14/ingestion-service:v1.2
+    container_name: ingestion-service
+    restart: unless-stopped
+    # ports:
+    #   - "8082:8082"
     env_file:
       - ./ingestion-service/.env
     environment:
@@ -14,19 +207,27 @@ services:
     networks:
       - flood-network
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8082/actuator/health"]
+      test: ["CMD-SHELL", "nc -z localhost 8082 || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 256M
 
   mqtt-broker:
     image: eclipse-mosquitto:2.0
     container_name: mqtt-broker
     restart: unless-stopped
     ports:
-      - "1883:1883"   # MQTT port
-      - "9001:9001"   # WebSocket port
+      - "1883:1883"
+      - "9001:9001"
     volumes:
       - ./mosquitto/config:/mosquitto/config
       - ./mosquitto/data:/mosquitto/data
@@ -36,8 +237,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          cpus: '0.5'
+          memory: 256M
         reservations:
+          cpus: '0.1'
           memory: 128M
     logging:
       driver: "json-file"
@@ -67,7 +270,7 @@ services:
 
       CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
 
-      KAFKA_HEAP_OPTS: "-Xmx512M -Xms512M"
+      KAFKA_HEAP_OPTS: "-Xmx1024M -Xms512M"
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
@@ -88,8 +291,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          cpus: '1.0'
+          memory: 1536M
         reservations:
+          cpus: '0.3'
           memory: 768M
     logging:
       driver: "json-file"
@@ -109,7 +314,7 @@ services:
       "redis-server",
       "--appendonly", "yes",
       "--requirepass", "NguyenLuong1405",
-      "--maxmemory", "256mb",
+      "--maxmemory", "512mb",
       "--maxmemory-policy", "allkeys-lru",
       "--save", "900 1",
       "--save", "300 10",
@@ -120,9 +325,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          cpus: '0.5'
+          memory: 768M
         reservations:
-          memory: 512M
+          cpus: '0.1'
+          memory: 384M
     logging:
       driver: "json-file"
       options:
@@ -140,13 +347,16 @@ services:
       POSTGRES_PASSWORD: "@NguyenLuong1405"
       POSTGRES_DB: flood_alert_db
       PGDATA: /var/lib/postgresql/data/pgdata
-
-      POSTGRES_SHARED_BUFFERS: 256MB
-      POSTGRES_EFFECTIVE_CACHE_SIZE: 512MB
-      POSTGRES_WORK_MEM: 8MB
-      POSTGRES_MAINTENANCE_WORK_MEM: 64MB
-      POSTGRES_MAX_CONNECTIONS: 100
-
+    command: >
+      postgres
+        -c shared_buffers=256MB
+        -c effective_cache_size=768MB
+        -c work_mem=16MB
+        -c maintenance_work_mem=128MB
+        -c max_connections=100
+        -c checkpoint_completion_target=0.9
+        -c wal_buffers=16MB
+        -c random_page_cost=1.1
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/initdb:/docker-entrypoint-initdb.d
@@ -155,11 +365,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 768M
+          cpus: '1.0'
+          memory: 1024M
         reservations:
+          cpus: '0.2'
           memory: 512M
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U floodalert -d flood_alert_db"]
+      test: ["CMD-SHELL", "pg_isready -U  -d flood_alert_db"]
       interval: 10s
       timeout: 5s
       retries: 5

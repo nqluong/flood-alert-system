@@ -25,7 +25,7 @@ WORKDIR /app
 RUN apk add --no-cache wget
 RUN addgroup -S spring && adduser -S spring -G spring
 
-COPY --from=build /app/flood-service/target/*.jar app.jar
+COPY --from=build /app/floodcore-service/target/*.jar app.jar
 RUN chown -R spring:spring /app
 USER spring:spring
 EXPOSE 8083
