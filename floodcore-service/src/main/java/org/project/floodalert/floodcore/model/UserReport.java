@@ -1,10 +1,8 @@
 package org.project.floodalert.floodcore.model;
 
-import io.hypersistence.utils.hibernate.type.array.StringArrayType;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.hibernate.annotations.Type;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -44,6 +42,9 @@ public class UserReport {
 
     @Column(name = "lon", nullable = false, precision = 11, scale = 8)
     BigDecimal lon;
+
+    @Column(name = "flood_event_id", length = 50)
+    String floodEventId;
 
     @Column(name = "status", length = 20)
     String status = "PENDING";

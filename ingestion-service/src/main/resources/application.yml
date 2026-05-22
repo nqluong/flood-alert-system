@@ -26,6 +26,8 @@ mqtt:
   topic-pattern: ${MQTT_TOPIC_PATTERN:floodguard/sensors/+/telemetry}
   qos: ${MQTT_QOS:1}
   auto-reconnect: ${MQTT_AUTO_RECONNECT:true}
+  username: ${MQTT_USERNAME:}
+  password: ${MQTT_PASSWORD:}
 
 kafka:
   bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}

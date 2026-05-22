@@ -32,6 +32,12 @@ public class MqttConfig {
     @Value("${mqtt.auto-reconnect:true}")
     private boolean autoReconnect;
 
+    @Value("${mqtt.username:}")
+    private String username;
+
+    @Value("${mqtt.password:}")
+    private String password;
+
     private MqttClient mqttClient;
 
     @Bean
@@ -43,6 +49,11 @@ public class MqttConfig {
         options.setAutomaticReconnect(autoReconnect);
         options.setConnectionTimeout(10);
         options.setKeepAliveInterval(60);
+
+        if (!username.isBlank()) {
+            options.setUserName(username);
+            options.setPassword(password.toCharArray());
+        }
 
         mqttClient.connect(options);
 

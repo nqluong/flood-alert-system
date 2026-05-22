@@ -58,6 +58,7 @@ public class UserReportMapper {
                 .lat(report.getLat() != null ? report.getLat().doubleValue() : null)
                 .lon(report.getLon() != null ? report.getLon().doubleValue() : null)
                 .status(report.getStatus())
+                .floodEventId(report.getFloodEventId())
                 .createdAt(report.getCreatedAt())
                 .build();
     }

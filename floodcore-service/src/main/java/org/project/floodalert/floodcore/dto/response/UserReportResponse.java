@@ -24,6 +24,7 @@ public class UserReportResponse {
     Double lat;
     Double lon;
     String status;
+    String floodEventId;
     LocalDateTime createdAt;
 
     String message;

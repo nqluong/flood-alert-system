@@ -8,8 +8,10 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 
@@ -29,7 +31,6 @@ public class ReportScoringEngine {
     public ScoringResult evaluateScore(ReportMessage msg) {
         boolean hasImage = msg.getImageUrl() != null && !msg.getImageUrl().isEmpty();
 
-        // Lọc các strategy áp dụng được
         List<ReportScoringStrategy> applicableStrategies = strategies.stream()
                 .filter(s -> s.isApplicable(msg))
                 .toList();
@@ -39,39 +40,64 @@ public class ReportScoringEngine {
 
         long startTime = System.currentTimeMillis();
 
-        // Map để lưu trữ điểm theo strategy name
-        Map<String, Double> strategyScores = new HashMap<>();
+        // Associate each future with its strategy name so we can track failures
+        record FutureWithName(String name, CompletableFuture<Double> future) {}
 
-        List<CompletableFuture<StrategyScore>> futures = applicableStrategies.stream()
-                .map(strategy -> CompletableFuture.supplyAsync(() -> {
-                    double rawScore = strategy.calculateScore(msg);
-                    double weight = getDynamicWeight(strategy.getStrategyName(), hasImage);
-                    double weightedScore = rawScore * weight;
-                    log.info("[SCORING-ENGINE] Strategy={} → rawScore={}, weight={}, weightedScore={}",
-                            strategy.getStrategyName(), rawScore, weight, weightedScore);
-                    return new StrategyScore(strategy.getStrategyName(), rawScore, weightedScore);
-                }, virtualThreadExecutor))
+        List<FutureWithName> futures = applicableStrategies.stream()
+                .map(s -> new FutureWithName(
+                        s.getStrategyName(),
+                        CompletableFuture.supplyAsync(() -> s.calculateScore(msg), virtualThreadExecutor)
+                ))
                 .toList();
+
+        Map<String, Double> successfulRawScores = new HashMap<>();
+        Set<String> failedNames = new HashSet<>();
+
+        for (FutureWithName fwn : futures) {
+            try {
+                successfulRawScores.put(fwn.name(), fwn.future().join());
+            } catch (Exception e) {
+                failedNames.add(fwn.name());
+                log.error("[SCORING-ENGINE] Strategy={} thất bại cho reportId={}: {}",
+                        fwn.name(), msg.getReportId(), e.getMessage());
+            }
+        }
+
+        // Sum weights of strategies that actually ran so we can normalise to [0,1]
+        double successfulWeightSum = applicableStrategies.stream()
+                .filter(s -> !failedNames.contains(s.getStrategyName()))
+                .mapToDouble(s -> getDynamicWeight(s.getStrategyName(), hasImage))
+                .sum();
+
+        if (successfulWeightSum == 0) {
+            log.warn("[SCORING-ENGINE] Tất cả strategy thất bại cho reportId={}", msg.getReportId());
+            return ScoringResult.builder().totalScore(0.0).build();
+        }
+
+        if (!failedNames.isEmpty()) {
+            log.warn("[SCORING-ENGINE] reportId={} — Strategy thất bại: {}. Phân phối lại trọng số trên tổng={}",
+                    msg.getReportId(), failedNames, successfulWeightSum);
+        }
 
         double totalScore = 0.0;
         double aiScore = 0.0;
         double spatialScore = 0.0;
         double reputationScore = 0.0;
 
-        for (CompletableFuture<StrategyScore> future : futures) {
-            try {
-                StrategyScore result = future.join();
-                totalScore += result.weightedScore;
+        for (Map.Entry<String, Double> entry : successfulRawScores.entrySet()) {
+            String name = entry.getKey();
+            double rawScore = entry.getValue();
+            double normalizedWeight = getDynamicWeight(name, hasImage) / successfulWeightSum;
+            double weightedScore = rawScore * normalizedWeight;
 
-                // Lưu raw score theo loại strategy (không phải weighted)
-                switch (result.strategyName) {
-                    case "AI_VISION" -> aiScore = result.rawScore;
-                    case "SPATIAL_CONSENSUS" -> spatialScore = result.rawScore;
-                    case "USER_REPUTATION" -> reputationScore = result.rawScore;
-                }
-            } catch (Exception e) {
-                log.error("[SCORING-ENGINE] Strategy thất bại cho reportId={}: {}",
-                        msg.getReportId(), e.getMessage(), e);
+            log.info("[SCORING-ENGINE] Strategy={} → rawScore={}, normalizedWeight={}, weightedScore={}",
+                    name, rawScore, normalizedWeight, weightedScore);
+
+            totalScore += weightedScore;
+            switch (name) {
+                case "AI_VISION" -> aiScore = rawScore;
+                case "SPATIAL_CONSENSUS" -> spatialScore = rawScore;
+                case "USER_REPUTATION" -> reputationScore = rawScore;
             }
         }
 
@@ -114,9 +140,4 @@ public class ReportScoringEngine {
         }
     }
 
-    /**
-     * Internal record để lưu kết quả từ mỗi strategy.
-     */
-    private record StrategyScore(String strategyName, double rawScore, double weightedScore) {
-    }
 }

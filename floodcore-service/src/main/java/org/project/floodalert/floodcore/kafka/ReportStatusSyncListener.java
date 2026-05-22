@@ -50,6 +50,11 @@ public class ReportStatusSyncListener {
             UserReport report = reportOpt.get();
             String oldStatus = report.getStatus();
 
+            // Lưu floodEventId từ processor (nếu chưa có)
+            if (event.getEventId() != null && report.getFloodEventId() == null) {
+                report.setFloodEventId(event.getEventId());
+            }
+
             // Cập nhật status
             report.setStatus(event.getStatus());
 

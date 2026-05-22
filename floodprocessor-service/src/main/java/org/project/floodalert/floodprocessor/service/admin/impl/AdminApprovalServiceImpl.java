@@ -138,9 +138,7 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
     }
 
     private FloodEvent findFloodEventByEventId(String eventId) {
-        return floodEventRepository.findAll().stream()
-                .filter(e -> e.getEventId().equals(eventId))
-                .findFirst()
+        return floodEventRepository.findByEventId(eventId)
                 .orElseThrow(() -> {
                     log.error("[ADMIN-APPROVAL] Không tìm thấy FloodEvent: eventId={}", eventId);
                     return new AppException(
