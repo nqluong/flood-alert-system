@@ -3,7 +3,6 @@ package org.project.floodalert.floodcore.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.dto.response.ApiResponse;
-import org.project.floodalert.floodcore.client.FloodProcessorClient;
 import org.project.floodalert.floodcore.dto.response.AdminActiveFloodResponse;
 import org.project.floodalert.floodcore.service.AdminFloodService;
 import org.springframework.http.HttpStatus;
@@ -17,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 
 @Slf4j
@@ -26,19 +26,11 @@ import java.util.List;
 public class AdminFloodController {
 
     private final AdminFloodService adminFloodService;
-    private final FloodProcessorClient floodProcessorClient;
 
-    /**
-     * API lấy toàn bộ danh sách điểm ngập đang hoạt động.
-     * Dùng cho Admin Dashboard khi initial load trang bản đồ.
-     *
-     */
     @GetMapping("/active")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<AdminActiveFloodResponse>>> getActiveFloods() {
-
         List<AdminActiveFloodResponse> activeFloods = adminFloodService.getAllActiveFloods();
-
         return ResponseEntity.ok(ApiResponse.<List<AdminActiveFloodResponse>>builder()
                 .code(HttpStatus.OK.value())
                 .success(true)
@@ -47,12 +39,17 @@ public class AdminFloodController {
                 .build());
     }
 
-    @PostMapping("/{eventId}/approve")
+    /**
+     * Admin phê duyệt một user report.
+     * Nhận userReportId (UUID pk của user_reports), tự resolve sang floodEventId,
+     * rồi forward sang floodprocessor để approve flood event.
+     */
+    @PostMapping("/{userReportId}/approve")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> approveFloodEvent(@PathVariable(name = "eventId") String eventId) {
-        log.info("[ADMIN-FLOOD-CONTROLLER] Admin duyệt flood event: eventId={}", eventId);
+    public ResponseEntity<ApiResponse<Void>> approveFloodEvent(@PathVariable UUID userReportId) {
+        log.info("[ADMIN-FLOOD-CONTROLLER] Admin phê duyệt report: userReportId={}", userReportId);
 
-        floodProcessorClient.approveFloodEvent(eventId);
+        adminFloodService.approveReport(userReportId);
 
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .code(HttpStatus.OK.value())
@@ -63,18 +60,16 @@ public class AdminFloodController {
     }
 
     /**
-     * Admin từ chối flood event PENDING.
-     * Gọi FloodProcessor qua FeignClient để thực hiện logic nghiệp vụ.
-     *
-     * @param eventId UUID của flood event cần từ chối
-     * @return ApiResponse xác nhận việc từ chối thành công
+     * Admin từ chối một user report.
+     * Nhận userReportId (UUID pk của user_reports), tự resolve sang floodEventId,
+     * rồi forward sang floodprocessor để reject flood event.
      */
-    @PostMapping("/{eventId}/reject")
+    @PostMapping("/{userReportId}/reject")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> rejectFloodEvent(@PathVariable(name = "eventId") String eventId) {
-        log.info("[ADMIN-FLOOD-CONTROLLER] Admin từ chối flood event: eventId={}", eventId);
+    public ResponseEntity<ApiResponse<Void>> rejectFloodEvent(@PathVariable UUID userReportId) {
+        log.info("[ADMIN-FLOOD-CONTROLLER] Admin từ chối report: userReportId={}", userReportId);
 
-        floodProcessorClient.rejectFloodEvent(eventId);
+        adminFloodService.rejectReport(userReportId);
 
         return ResponseEntity.ok(ApiResponse.<Void>builder()
                 .code(HttpStatus.OK.value())

@@ -6,6 +6,7 @@ import org.project.floodalert.floodprocessor.dto.request.SensorMessage;
 import org.project.floodalert.floodprocessor.dto.response.EnrichedSensorData;
 import org.project.floodalert.floodprocessor.service.cache.RedisCacheService;
 import org.project.floodalert.floodprocessor.service.core.BusinessLogicService;
+import org.project.floodalert.floodprocessor.tracker.SensorTelemetryTracker;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -17,6 +18,7 @@ public class SensorDataBatchProcessor {
 
     private final RedisCacheService redisCacheService;
     private final BusinessLogicService businessLogicService;
+    private final SensorTelemetryTracker telemetryTracker;
 
     /**
      * Xử lý batch sensor messages
@@ -43,6 +45,9 @@ public class SensorDataBatchProcessor {
                 log.warn("Không có enriched data hợp lệ sau khi enrich & validate");
                 return;
             }
+
+            // Cập nhật thời điểm nhận tín hiệu cuối cho mỗi sensor hợp lệ
+            enrichedDataList.forEach(d -> telemetryTracker.updateLastSeen(d.getSensorId()));
 
             // Step 4: Handover to Business Logic
             businessLogicService.process(enrichedDataList);

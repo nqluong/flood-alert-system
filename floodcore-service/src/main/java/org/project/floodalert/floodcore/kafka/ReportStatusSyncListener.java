@@ -13,9 +13,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-/**
- * Kafka Consumer để đồng bộ status của UserReport từ flood-processor
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor

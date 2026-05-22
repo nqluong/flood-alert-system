@@ -142,15 +142,19 @@ public class StaticLocationScanner {
 
             contexts.compute(userId, (key, existing) -> {
                 if (existing == null) {
+                    Map<String, Double> zoneDistances = new HashMap<>();
+                    zoneDistances.put(zoneName, hit.distance());
                     List<String> zones = new ArrayList<>();
                     zones.add(zoneName);
                     return NotificationContext.builder()
                             .userId(userId)
                             .affectedZones(zones)
+                            .zoneDistances(zoneDistances)
                             .staticDistance(hit.distance())
                             .build();
                 }
                 existing.getAffectedZones().add(zoneName);
+                existing.getZoneDistances().merge(zoneName, hit.distance(), Math::min);
                 if (existing.getStaticDistance() == null || hit.distance() < existing.getStaticDistance()) {
                     existing.setStaticDistance(hit.distance());
                 }

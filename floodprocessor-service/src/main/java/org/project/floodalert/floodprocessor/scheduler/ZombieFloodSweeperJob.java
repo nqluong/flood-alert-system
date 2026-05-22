@@ -5,10 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.config.SystemConfigService;
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
+import org.project.floodalert.floodprocessor.messaging.publisher.LifecycleEventPublisher;
 import org.project.floodalert.floodprocessor.tracker.SensorTelemetryTracker;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -22,8 +22,7 @@ public class ZombieFloodSweeperJob {
     private final SensorTelemetryTracker telemetryTracker;
     private final SystemConfigService configService;
     private final FloodEventRepository floodEventRepository;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
-
+    private final LifecycleEventPublisher lifecycleEventPublisher;
 
     @Scheduled(fixedDelay = 180000)
     public void sweepZombieFloodEvents() {
@@ -43,17 +42,16 @@ public class ZombieFloodSweeperJob {
                 log.debug("Sự kiện ngập ID {} đã được đóng do sensor {} không gửi tín hiệu trong {} ms.",
                         event.getId(), sensorId, timeout);
 
-                // Publish lifecycle event to Kafka
                 FloodLifecycleEvent lifecycleEvent = FloodLifecycleEvent.builder()
                         .eventId(event.getEventId())
                         .type(LifecycleEventType.RESOLVED)
                         .location(event.getLocationDescription())
                         .lat(event.getLat().doubleValue())
                         .lon(event.getLon().doubleValue())
-                        .waterLevel(0.0)
+                        .waterLevel(null)
                         .severityLevel("SAFE")
                         .build();
-                kafkaTemplate.send("flood-lifecycle-events", lifecycleEvent);
+                lifecycleEventPublisher.publish(lifecycleEvent);
             }
         }
     }

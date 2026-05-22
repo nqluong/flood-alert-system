@@ -4,6 +4,8 @@ import org.project.floodalert.notification.dto.event.FloodEventDTO;
 import org.project.floodalert.notification.model.NotificationContext;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class NotificationMessageBuilder {
 
@@ -19,16 +21,30 @@ public class NotificationMessageBuilder {
         if (context.isBothAffected()) {
             return String.format(
                     "Khu vực bạn đang di chuyển VÀ gần %s đang có ngập lụt (mức độ: %s). Hãy chú ý an toàn!",
-                    String.join(", ", context.getAffectedZones()), severityVi);
+                    formatZones(context.getAffectedZones()), severityVi);
         }
         if (context.isNearActive()) {
             return String.format(
                     "Có điểm ngập lụt cách vị trí hiện tại của bạn khoảng %.0fm (mức độ: %s). Chú ý hướng di chuyển!",
                     context.getActiveDistance(), severityVi);
         }
+
+        List<String> zones = context.getAffectedZones();
+        if (zones.size() == 1) {
+            return String.format(
+                    "Cảnh báo: Khu vực quanh %s của bạn vừa xuất hiện điểm ngập (mức độ: %s).",
+                    zones.get(0), severityVi);
+        }
         return String.format(
-                "Cảnh báo: Khu vực quanh %s của bạn vừa xuất hiện điểm ngập (mức độ: %s).",
-                String.join(", ", context.getAffectedZones()), severityVi);
+                "Cảnh báo: %d địa điểm bạn đã lưu (%s) có điểm ngập lân cận (mức độ: %s).",
+                zones.size(), formatZones(zones), severityVi);
+    }
+
+    private String formatZones(List<String> zones) {
+        if (zones == null || zones.isEmpty()) return "";
+        if (zones.size() == 1) return zones.get(0);
+        return String.join(", ", zones.subList(0, zones.size() - 1))
+                + " và " + zones.get(zones.size() - 1);
     }
 
     public String resolvedTitle() {

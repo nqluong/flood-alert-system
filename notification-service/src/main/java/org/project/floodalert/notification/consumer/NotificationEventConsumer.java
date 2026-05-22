@@ -35,13 +35,21 @@ public class NotificationEventConsumer {
     private final NotificationPreferenceRepository preferenceRepository;
     private final FcmDispatchService fcmDispatchService;
 
-    // Scan toàn bộ trong 10km (max frontend slider), filter per-user sau theo alertRadiusMeters
     private static final double MAX_SCAN_RADIUS_METERS = 10_000.0;
     private static final int MAX_RETRIES = 3;
 
     private static final String TYPE_RESOLVED = "RESOLVED";
     private static final String NOTIFICATION_TYPE_FLOOD_ALERT = "FLOOD_ALERT";
     private static final String NOTIFICATION_TYPE_FLOOD_RESOLVED = "FLOOD_RESOLVED";
+
+    // Default áp dụng khi user chưa có preference record trong DB
+    private static final NotificationPreference DEFAULT_PREFERENCE = NotificationPreference.builder()
+            .enabled(true)
+            .floodAlerts(true)
+            .preferPush(true)
+            .alertRadiusMeters(500)
+            .quietHoursEnabled(false)
+            .build();
 
     @KafkaListener(topics = "${app.kafka.topic.lifecycle-events}", groupId = "notification-push-group", containerFactory = "lifecycleKafkaListenerContainerFactory")
     @Transactional
@@ -51,6 +59,15 @@ public class NotificationEventConsumer {
             log.info("[NotifConsumer] Xử lý event eventId={}, type={}, severity={}, location=({},{})",
                     event.getEventId(), event.getType(), event.getSeverityLevel(),
                     event.getLat(), event.getLon());
+
+            // Không gửi alert khi severity SAFE/NONE — chỉ cho phép RESOLVED xử lý "hết
+            // ngập"
+            if (!isResolved && isSafeLevel(event.getSeverityLevel())) {
+                log.warn("[NotifConsumer] Bỏ qua ALERT với severity={}. eventId={}",
+                        event.getSeverityLevel(), event.getEventId());
+                ack.acknowledge();
+                return;
+            }
 
             FloodEventDTO dto = convertToFloodEventDTO(event);
 
@@ -95,10 +112,6 @@ public class NotificationEventConsumer {
                 .build();
     }
 
-    /**
-     * Filter users theo preferences: enabled, floodAlerts (severeOnly mode),
-     * preferPush, quietHours.
-     */
     private Map<UUID, NotificationContext> filterThroughPreferences(Map<UUID, NotificationContext> contexts,
             String severityLevel) {
         Set<UUID> userIds = contexts.keySet();
@@ -106,42 +119,75 @@ public class NotificationEventConsumer {
                 .collect(Collectors.toMap(NotificationPreference::getUserId, p -> p));
 
         return contexts.entrySet().stream()
-                .filter(entry -> isAllowed(preferenceMap.get(entry.getKey()), severityLevel, entry.getValue()))
+                .filter(entry -> {
+                    NotificationPreference pref = preferenceMap.get(entry.getKey());
+                    return isAllowed(pref, severityLevel, entry.getValue());
+                })
+                .peek(entry -> {
+                    NotificationPreference pref = preferenceMap.get(entry.getKey());
+                    trimZonesOutsideRadius(entry.getValue(), pref);
+                })
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private boolean isAllowed(NotificationPreference pref, String severityLevel, NotificationContext context) {
-        if (pref == null) return true;
+        // Khi user chưa có preference record → áp dụng default thay vì bypass toàn bộ
+        // filter
+        NotificationPreference effective = (pref != null) ? pref : DEFAULT_PREFERENCE;
 
-        if (!Boolean.TRUE.equals(pref.getEnabled())
-                || !Boolean.TRUE.equals(pref.getPreferPush())) {
+        if (!Boolean.TRUE.equals(effective.getEnabled())
+                || !Boolean.TRUE.equals(effective.getPreferPush())) {
             return false;
         }
 
-        // floodAlerts=false → chế độ "chỉ báo động ngập sâu": chỉ cho qua MEDIUM trở lên
-        if (!Boolean.TRUE.equals(pref.getFloodAlerts()) && !isMediumOrAbove(severityLevel)) {
+        // floodAlerts=false → chỉ cho qua MEDIUM trở lên
+        if (!Boolean.TRUE.equals(effective.getFloodAlerts()) && !isMediumOrAbove(severityLevel)) {
             return false;
         }
 
-        if (!isWithinUserRadius(pref, context)) {
+        if (!isWithinUserRadius(effective, context)) {
             return false;
         }
 
-        return !isInQuietHours(pref);
+        return !isInQuietHours(effective);
     }
 
     private boolean isWithinUserRadius(NotificationPreference pref, NotificationContext context) {
-        if (pref.getAlertRadiusMeters() == null) return true;
-        double radiusMeters = pref.getAlertRadiusMeters();
+        double radiusMeters = (pref.getAlertRadiusMeters() != null)
+                ? pref.getAlertRadiusMeters()
+                : DEFAULT_PREFERENCE.getAlertRadiusMeters();
 
         if (context.isNearActive() && context.getActiveDistance() != null
                 && context.getActiveDistance() <= radiusMeters) {
             return true;
         }
-        if (context.getStaticDistance() != null && context.getStaticDistance() <= radiusMeters) {
-            return true;
-        }
-        return false;
+        return context.getStaticDistance() != null && context.getStaticDistance() <= radiusMeters;
+    }
+
+    /**
+     * Loại bỏ các zone trong affectedZones có khoảng cách tới điểm ngập >
+     * alertRadiusMeters
+     * để tránh thông báo đề cập địa điểm nằm ngoài bán kính người dùng cài đặt.
+     */
+    private void trimZonesOutsideRadius(NotificationContext context, NotificationPreference pref) {
+        if (context.getZoneDistances() == null || context.getZoneDistances().isEmpty())
+            return;
+        double radiusMeters = (pref != null && pref.getAlertRadiusMeters() != null)
+                ? pref.getAlertRadiusMeters()
+                : DEFAULT_PREFERENCE.getAlertRadiusMeters();
+        context.getAffectedZones().removeIf(zone -> {
+            Double dist = context.getZoneDistances().get(zone);
+            return dist != null && dist > radiusMeters;
+        });
+    }
+
+    private boolean isSafeLevel(String severityLevel) {
+        if (severityLevel == null)
+            return false;
+        return switch (severityLevel.toUpperCase()) {
+            case "SAFE", "NONE" -> true;
+            default -> false;
+        };
     }
 
     private boolean isMediumOrAbove(String severityLevel) {

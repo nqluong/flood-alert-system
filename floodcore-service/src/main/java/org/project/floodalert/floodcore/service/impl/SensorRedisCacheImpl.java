@@ -51,21 +51,21 @@ public class SensorRedisCacheImpl implements SensorRedisCache {
 
         Map<String, Object> metadata = new HashMap<>();
         metadata.put("id", sensor.getId().toString());
-        metadata.put("sensorId", sensor.getSensorId());
+        metadata.put("sensor_id", sensor.getSensorId());
         metadata.put("name", sensor.getName());
-        metadata.put("locationName", sensor.getLocationName());
+        metadata.put("location_name", sensor.getLocationName());
         metadata.put("lat", sensor.getLat().toString());
         metadata.put("lon", sensor.getLon().toString());
         metadata.put("status", sensor.getStatus());
-        metadata.put("apiKey", sensor.getApiKey());
-        metadata.put("warningThreshold", sensor.getWarningThreshold().toString());
-        metadata.put("dangerThreshold", sensor.getDangerThreshold().toString());
+        metadata.put("api_key", sensor.getApiKey());
+        metadata.put("warning_threshold", sensor.getWarningThreshold().toString());
+        metadata.put("danger_threshold", sensor.getDangerThreshold().toString());
 
         if (sensor.getHardwareModel() != null) {
-            metadata.put("hardwareModel", sensor.getHardwareModel());
+            metadata.put("hardware_model", sensor.getHardwareModel());
         }
         if (sensor.getFirmwareVersion() != null) {
-            metadata.put("firmwareVersion", sensor.getFirmwareVersion());
+            metadata.put("firmware_version", sensor.getFirmwareVersion());
         }
 
         cacheService.hSetAll(key, metadata);
