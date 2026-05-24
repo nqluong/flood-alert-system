@@ -83,7 +83,8 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                 ReportMessage msg = toReportMessage(event);
 
                 if (isSpamming(msg)) {
-                        log.info("Người dùng spam quá nhiều");
+                        log.info("[REPORT-PROCESSOR] Spam detected: userId={}, reportId={}", msg.getUserId(), msg.getReportId());
+                        publishReportStatusEvent(msg, STATUS_REJECTED, null, "Báo cáo bị từ chối do gửi quá nhiều lần trong thời gian ngắn", 0.0);
                         return;
                 }
 

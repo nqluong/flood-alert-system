@@ -27,5 +27,7 @@ public class UserReportResponse {
     String floodEventId;
     LocalDateTime createdAt;
 
+    Double score;
+
     String message;
 }

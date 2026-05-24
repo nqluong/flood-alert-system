@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 @UtilityClass
 public class AvoidPolygonBuilder {
 
-    public static final double POLYGON_OFFSET = 0.002;
+    public static final double POLYGON_OFFSET = 0.001;
 
     /**
      * Tạo danh sách polygon hình vuông bao quanh các điểm ngập nguy hiểm.

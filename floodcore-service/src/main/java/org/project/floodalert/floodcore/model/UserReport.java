@@ -58,6 +58,9 @@ public class UserReport {
     @Column(name = "reject_reason", columnDefinition = "TEXT")
     String rejectReason;
 
+    @Column(name = "score")
+    Double score;
+
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
 

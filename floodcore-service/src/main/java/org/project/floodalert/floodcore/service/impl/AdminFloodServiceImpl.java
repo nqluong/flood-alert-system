@@ -14,6 +14,7 @@ import org.project.floodalert.floodcore.service.AdminFloodService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,7 +44,20 @@ public class AdminFloodServiceImpl implements AdminFloodService {
 
     @Override
     public void rejectReport(UUID userReportId) {
-        String floodEventId = resolveFloodEventId(userReportId);
+        UserReport report = userReportRepository.findById(userReportId)
+                .orElseThrow(() -> new AppException(CoreErrorCode.USER_REPORT_NOT_FOUND,
+                        "Không tìm thấy báo cáo: " + userReportId));
+
+        if (report.getFloodEventId() == null) {
+            log.info("[ADMIN-FLOOD-SERVICE] Reject report (no floodEventId): userReportId={}", userReportId);
+            report.setStatus("REJECTED");
+            report.setRejectReason("Bị từ chối bởi admin");
+            report.setReviewedAt(java.time.LocalDateTime.now());
+            userReportRepository.save(report);
+            return;
+        }
+
+        String floodEventId = report.getFloodEventId();
         log.info("[ADMIN-FLOOD-SERVICE] Reject report: userReportId={}, floodEventId={}", userReportId, floodEventId);
         floodProcessorClient.rejectFloodEvent(floodEventId);
     }
@@ -54,7 +68,7 @@ public class AdminFloodServiceImpl implements AdminFloodService {
                         "Không tìm thấy báo cáo: " + userReportId));
 
         if (report.getFloodEventId() == null) {
-            throw new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR,
+            throw new AppException(CoreErrorCode.REPORT_NOT_LINKED_TO_EVENT,
                     "Báo cáo chưa được xử lý bởi hệ thống, vui lòng thử lại sau");
         }
 

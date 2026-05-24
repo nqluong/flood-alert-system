@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Component
@@ -65,6 +66,11 @@ public class ReportStatusSyncListener {
             if ("APPROVED".equals(event.getStatus())) {
                 report.setRejectReason(null);
                 report.setReviewedAt(LocalDateTime.now());
+            }
+
+            // Lưu điểm chấm từ processor (nếu có)
+            if (event.getScore() != null) {
+                report.setScore(event.getScore());
             }
 
             userReportRepository.save(report);

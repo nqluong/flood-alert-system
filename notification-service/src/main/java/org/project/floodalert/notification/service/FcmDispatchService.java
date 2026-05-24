@@ -90,8 +90,6 @@ public class FcmDispatchService {
             return 0;
         }
 
-        preGenerateIds(validNotifications);
-
         int successCount = sendToFirebase(validNotifications);
 
         // Chỉ save 1 lần ở cuối, sau khi đã cập nhật status/messageId/sentAt.
@@ -138,12 +136,6 @@ public class FcmDispatchService {
         }
 
         return partitioned.get(true);
-    }
-
-    private void preGenerateIds(List<Notification> notifications) {
-        notifications.stream()
-                .filter(n -> n.getId() == null)
-                .forEach(n -> n.setId(UUID.randomUUID()));
     }
 
     private int sendToFirebase(List<Notification> notifications) {

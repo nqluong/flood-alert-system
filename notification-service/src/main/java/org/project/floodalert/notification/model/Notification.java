@@ -8,7 +8,6 @@ import org.hibernate.annotations.Type;
 import org.project.floodalert.notification.enums.NotificationChannel;
 import org.project.floodalert.notification.enums.NotificationPriority;
 import org.project.floodalert.notification.enums.NotificationStatus;
-
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.UUID;
@@ -25,9 +24,9 @@ import java.util.UUID;
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class Notification {
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "id", updatable = false, nullable = false)
-    UUID id;
+    @Builder.Default
+    UUID id = UUID.randomUUID();
 
     @Column(name = "user_id", nullable = false)
     UUID userId;
@@ -100,6 +99,7 @@ public class Notification {
 
     @PrePersist
     protected void onCreate() {
+        if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = LocalDateTime.now();
     }
 }

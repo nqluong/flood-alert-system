@@ -46,7 +46,7 @@ public class AdminFloodController {
      */
     @PostMapping("/{userReportId}/approve")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> approveFloodEvent(@PathVariable UUID userReportId) {
+    public ResponseEntity<ApiResponse<Void>> approveFloodEvent(@PathVariable(name = "userReportId") UUID userReportId) {
         log.info("[ADMIN-FLOOD-CONTROLLER] Admin phê duyệt report: userReportId={}", userReportId);
 
         adminFloodService.approveReport(userReportId);
@@ -66,7 +66,7 @@ public class AdminFloodController {
      */
     @PostMapping("/{userReportId}/reject")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> rejectFloodEvent(@PathVariable UUID userReportId) {
+    public ResponseEntity<ApiResponse<Void>> rejectFloodEvent(@PathVariable(name = "userReportId") UUID userReportId) {
         log.info("[ADMIN-FLOOD-CONTROLLER] Admin từ chối report: userReportId={}", userReportId);
 
         adminFloodService.rejectReport(userReportId);

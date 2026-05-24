@@ -20,6 +20,7 @@ public enum CoreErrorCode implements BaseErrorCode {
 
     USER_REPORT_NOT_FOUND(4010, "Không tìm thấy báo cáo", HttpStatus.NOT_FOUND),
     USER_REPORT_ALREADY_REVIEWED(4011, "Báo cáo đã được xét duyệt trước đó", HttpStatus.CONFLICT),
+    REPORT_NOT_LINKED_TO_EVENT(4013, "Báo cáo chưa được hệ thống xử lý, vui lòng thử lại sau", HttpStatus.CONFLICT),
 
     FIREBASE_STORAGE_ERROR(5003, "Lỗi khi tạo URL upload", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_FILE_EXTENSION(4012, "Định dạng file không hợp lệ", HttpStatus.BAD_REQUEST),

@@ -59,7 +59,7 @@ public class InternalAdminFloodController {
      * @return ApiResponse xác nhận việc từ chối thành công
      */
     @PostMapping("/{eventId}/reject")
-    public ResponseEntity<ApiResponse<Void>> rejectFloodEvent(@PathVariable String eventId) {
+    public ResponseEntity<ApiResponse<Void>> rejectFloodEvent(@PathVariable(name = "eventId") String eventId) {
         log.info("[INTERNAL-ADMIN-CONTROLLER] Nhận request từ chối flood event: eventId={}", eventId);
 
         adminApprovalService.rejectEvent(eventId);
