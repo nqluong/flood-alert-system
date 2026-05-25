@@ -94,6 +94,7 @@ public class AdminSocketDispatcher {
                 .timestamp(event.getTimestamp())
                 .alertMessage(alertMessage)
                 .alertLevel(alertLevel)
+                .source(event.getSource())
                 .build();
     }
 

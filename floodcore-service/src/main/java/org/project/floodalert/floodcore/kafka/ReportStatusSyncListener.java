@@ -72,6 +72,15 @@ public class ReportStatusSyncListener {
             if (event.getScore() != null) {
                 report.setScore(event.getScore());
             }
+            if (event.getAiScore() != null) {
+                report.setAiScore(event.getAiScore());
+            }
+            if (event.getSpatialScore() != null) {
+                report.setSpatialScore(event.getSpatialScore());
+            }
+            if (event.getReputationScore() != null) {
+                report.setReputationScore(event.getReputationScore());
+            }
 
             userReportRepository.save(report);
 

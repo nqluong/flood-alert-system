@@ -28,6 +28,9 @@ public class UserReportResponse {
     LocalDateTime createdAt;
 
     Double score;
+    Double aiScore;
+    Double spatialScore;
+    Double reputationScore;
 
     String message;
 }

@@ -90,6 +90,9 @@ public class CoreActiveFloodSyncService {
         flood.setWaterLevel(event.getWaterLevel() != null ? BigDecimal.valueOf(event.getWaterLevel()) : null);
         flood.setSeverityLevel(event.getSeverityLevel());
         flood.setStatus("CONFIRMED");
+        if (event.getSource() != null) {
+            flood.setSource(event.getSource());
+        }
 
         coreActiveFloodRepository.save(flood);
         log.debug("[FloodListener] Đã upsert DB eventId={}", event.getEventId());

@@ -45,4 +45,8 @@ public class ReportStatusUpdateEvent {
      * Điểm số đạt được từ scoring engine
      */
     Double score;
+
+    Double aiScore;
+    Double spatialScore;
+    Double reputationScore;
 }

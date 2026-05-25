@@ -71,4 +71,9 @@ public class AdminAlertDTO {
      * Frontend có thể dùng để chọn màu sắc, icon
      */
     String alertLevel;
+
+    /**
+     * Nguồn tạo ra flood event: SENSOR | USER_REPORT
+     */
+    String source;
 }

@@ -91,6 +91,7 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                 .location(savedEvent.getLocationDescription())
                 .lat(savedEvent.getLat())
                 .lon(savedEvent.getLon())
+                .source(savedEvent.getSource())
                 .timestamp(LocalDateTime.now())
                 .build();
 

@@ -23,5 +23,7 @@ public class AdminActiveFloodResponse {
 
     String status;
 
+    String source;
+
     LocalDateTime updatedAt;
 }

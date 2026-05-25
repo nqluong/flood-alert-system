@@ -89,6 +89,7 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
                 .location(floodEvent.getLocationDescription())
                 .lat(floodEvent.getLat())
                 .lon(floodEvent.getLon())
+                .source(floodEvent.getSource())
                 .timestamp(LocalDateTime.now())
                 .build();
     }

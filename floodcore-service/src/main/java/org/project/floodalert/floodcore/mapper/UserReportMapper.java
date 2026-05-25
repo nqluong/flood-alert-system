@@ -60,6 +60,9 @@ public class UserReportMapper {
                 .status(report.getStatus())
                 .floodEventId(report.getFloodEventId())
                 .score(report.getScore())
+                .aiScore(report.getAiScore())
+                .spatialScore(report.getSpatialScore())
+                .reputationScore(report.getReputationScore())
                 .createdAt(report.getCreatedAt())
                 .build();
     }

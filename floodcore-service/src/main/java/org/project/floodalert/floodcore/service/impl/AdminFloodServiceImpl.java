@@ -84,6 +84,7 @@ public class AdminFloodServiceImpl implements AdminFloodService {
                 .waterLevel(entity.getWaterLevel() != null ? entity.getWaterLevel().doubleValue() : null)
                 .severityLevel(entity.getSeverityLevel())
                 .status(entity.getStatus())
+                .source(entity.getSource())
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }

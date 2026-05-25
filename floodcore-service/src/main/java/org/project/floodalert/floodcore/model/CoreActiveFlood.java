@@ -38,6 +38,9 @@ public class CoreActiveFlood {
     @Column(name = "status")
     String status;
 
+    @Column(name = "source", length = 20)
+    String source;
+
     @Column(name = "updated_at")
     LocalDateTime updatedAt;
 

@@ -38,6 +38,9 @@ public class FloodLifecycleEvent {
     /** Kinh độ của địa điểm ngập */
     Double lon;
 
+    /** Nguồn tạo ra event: SENSOR | USER_REPORT */
+    String source;
+
     /** Thời điểm sự kiện vòng đời này được tạo ra */
     @Builder.Default
     LocalDateTime timestamp = LocalDateTime.now();

@@ -61,6 +61,15 @@ public class UserReport {
     @Column(name = "score")
     Double score;
 
+    @Column(name = "ai_score")
+    Double aiScore;
+
+    @Column(name = "spatial_score")
+    Double spatialScore;
+
+    @Column(name = "reputation_score")
+    Double reputationScore;
+
     @Column(name = "created_at", updatable = false)
     LocalDateTime createdAt;
 

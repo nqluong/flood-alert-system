@@ -84,7 +84,8 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
                 if (isSpamming(msg)) {
                         log.info("[REPORT-PROCESSOR] Spam detected: userId={}, reportId={}", msg.getUserId(), msg.getReportId());
-                        publishReportStatusEvent(msg, STATUS_REJECTED, null, "Báo cáo bị từ chối do gửi quá nhiều lần trong thời gian ngắn", 0.0);
+                        ScoringResult zeroResult = ScoringResult.builder().totalScore(0.0).build();
+                        publishReportStatusEvent(msg, STATUS_REJECTED, null, "Báo cáo bị từ chối do gửi quá nhiều lần trong thời gian ngắn", zeroResult);
                         return;
                 }
 
@@ -156,7 +157,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
                         // Bắn event cập nhật status = REJECTED về flood-core
                         publishReportStatusEvent(msg, STATUS_REJECTED, newEvent.getEventId(),
-                                        "Điểm số quá thấp (score < 0.5)", totalScore);
+                                        "Điểm số quá thấp (score < 0.5)", scoringResult);
 
                 } else if (STATUS_PENDING.equals(newEvent.getStatus())) {
                         // PENDING -> Hold reward (Delayed Reward Mechanism)
@@ -164,7 +165,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         msg.getReportId(), msg.getUserId(), totalScore);
 
                         // Bắn event cập nhật status = PENDING về flood-core
-                        publishReportStatusEvent(msg, STATUS_PENDING, newEvent.getEventId(), null, totalScore);
+                        publishReportStatusEvent(msg, STATUS_PENDING, newEvent.getEventId(), null, scoringResult);
 
                 } else if (STATUS_ACTIVE.equals(newEvent.getStatus())) {
                         // Event mới ngay lập tức ACTIVE (score >= 0.8) -> Reward PIONEER ngay
@@ -177,7 +178,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         ReputationReason.CLUSTER_APPROVED, POINTS_PIONEER_APPROVED, msg.getReportId());
 
                         // Bắn event cập nhật status = APPROVED về flood-core
-                        publishReportStatusEvent(msg, "APPROVED", newEvent.getEventId(), null, totalScore);
+                        publishReportStatusEvent(msg, "APPROVED", newEvent.getEventId(), null, scoringResult);
 
                         log.info("[REPORT-PROCESSOR][NEW-REPORT] Hoàn tất: eventId={}, status={}, score={}",
                                         newEvent.getEventId(), newEvent.getStatus(), totalScore);
@@ -219,7 +220,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                 publishLifecycleEvent(updatedEvent, LifecycleEventType.UPDATED);
 
                 // Bắn event cập nhật status = APPROVED về flood-core (fast path không có score)
-                publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, null);
+                publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, (ScoringResult) null);
 
                 log.info("[REPORT-PROCESSOR][FAST-UPDATE] Hoàn tất: eventId={}, vote_count={}",
                                 updatedEvent.getEventId(), updatedEvent.getVoteCount());
@@ -296,11 +297,11 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                         }
 
                         // Bắn event cập nhật status = APPROVED về flood-core (PENDING -> ACTIVE)
-                        publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, newScore);
+                        publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, scoringResult);
 
                 } else {
                         // Vẫn còn PENDING -> giữ nguyên status PENDING
-                        publishReportStatusEvent(msg, STATUS_PENDING, updatedEvent.getEventId(), null, newScore);
+                        publishReportStatusEvent(msg, STATUS_PENDING, updatedEvent.getEventId(), null, scoringResult);
                 }
 
                 // Bắn Kafka UPDATED event
@@ -366,7 +367,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
         }
 
         private void publishReportStatusEvent(ReportMessage msg, String status,
-                        String eventId, String rejectReason, Double score) {
+                        String eventId, String rejectReason, ScoringResult scoringResult) {
                 try {
                         ReportStatusUpdateEvent event = ReportStatusUpdateEvent.builder()
                                         .reportId(msg.getReportId())
@@ -374,13 +375,17 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         .status(status)
                                         .eventId(eventId)
                                         .rejectReason(rejectReason)
-                                        .score(score)
+                                        .score(scoringResult != null ? scoringResult.getTotalScore() : null)
+                                        .aiScore(scoringResult != null ? scoringResult.getAiScore() : null)
+                                        .spatialScore(scoringResult != null ? scoringResult.getSpatialScore() : null)
+                                        .reputationScore(scoringResult != null ? scoringResult.getReputationScore() : null)
                                         .build();
 
                         kafkaTemplate.send(reportStatusTopic, msg.getReportId(), event);
 
                         log.info("[REPORT-STATUS] Published: reportId={}, status={}, eventId={}, score={}",
-                                        msg.getReportId(), status, eventId, score);
+                                        msg.getReportId(), status, eventId,
+                                        scoringResult != null ? scoringResult.getTotalScore() : null);
 
                 } catch (Exception e) {
                         log.error("[REPORT-STATUS] Publish failed (non-critical): reportId={}, status={}: {}",

@@ -21,4 +21,7 @@ public class ReportStatusUpdateEvent {
     String eventId;
     String rejectReason;
     Double score;
+    Double aiScore;
+    Double spatialScore;
+    Double reputationScore;
 }
