@@ -4,18 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.floodprocessor.dto.request.SensorMessage;
 
-/**
- * Utility class để validate Kafka message format
- * Dùng để debug và test message structure
- */
+
 @Slf4j
 public class KafkaMessageValidator {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Validate message structure và log chi tiết
-     */
     public static boolean validateMessage(String jsonMessage) {
         try {
             SensorMessage message = objectMapper.readValue(jsonMessage, SensorMessage.class);

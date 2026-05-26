@@ -23,7 +23,7 @@ public class ReportScoringEngine {
     private final ExecutorService virtualThreadExecutor;
 
     public ReportScoringEngine(List<ReportScoringStrategy> strategies,
-                               @Qualifier("virtualThreadExecutor") ExecutorService virtualThreadExecutor) {
+            @Qualifier("virtualThreadExecutor") ExecutorService virtualThreadExecutor) {
         this.strategies = strategies;
         this.virtualThreadExecutor = virtualThreadExecutor;
     }
@@ -40,14 +40,13 @@ public class ReportScoringEngine {
 
         long startTime = System.currentTimeMillis();
 
-        // Associate each future with its strategy name so we can track failures
-        record FutureWithName(String name, CompletableFuture<Double> future) {}
+        record FutureWithName(String name, CompletableFuture<Double> future) {
+        }
 
         List<FutureWithName> futures = applicableStrategies.stream()
                 .map(s -> new FutureWithName(
                         s.getStrategyName(),
-                        CompletableFuture.supplyAsync(() -> s.calculateScore(msg), virtualThreadExecutor)
-                ))
+                        CompletableFuture.supplyAsync(() -> s.calculateScore(msg), virtualThreadExecutor)))
                 .toList();
 
         Map<String, Double> successfulRawScores = new HashMap<>();
@@ -63,7 +62,6 @@ public class ReportScoringEngine {
             }
         }
 
-        // Sum weights of strategies that actually ran so we can normalise to [0,1]
         double successfulWeightSum = applicableStrategies.stream()
                 .filter(s -> !failedNames.contains(s.getStrategyName()))
                 .mapToDouble(s -> getDynamicWeight(s.getStrategyName(), hasImage))
@@ -113,11 +111,6 @@ public class ReportScoringEngine {
                 .build();
     }
 
-    /**
-     * Backward compatibility: Trả về tổng điểm dạng double.
-     *
-     * @deprecated Sử dụng evaluateScore() để lấy thông tin chi tiết
-     */
     @Deprecated
     public double evaluateTotalScore(ReportMessage msg) {
         return evaluateScore(msg).getTotalScore();

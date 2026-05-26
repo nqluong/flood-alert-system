@@ -20,8 +20,8 @@ import java.util.List;
  *   <li><b>Bước 1 — Kiểm tra IoT:</b> Nếu có trạm cảm biến trong bán kính {@value #RADIUS_KM}km
  *       cập nhật trong {@value #TIME_WINDOW_MINUTES} phút qua:
  *       <ul>
- *         <li>Trạm báo ngập (WARNING/DANGER hoặc mực nước &gt; {@value #FLOOD_WATER_LEVEL_CM}cm) tới 100.0 (bảo chứng vàng)</li>
- *         <li>Trạm báo an toàn (SAFE hoặc mực nước = 0cm) tới 0.0 (phủ quyết từ máy)</li>
+ *         <li>Trạm báo ngập (WARNING/DANGER hoặc mực nước &gt; {@value #FLOOD_WATER_LEVEL_CM}cm) tới 100.0</li>
+ *         <li>Trạm báo an toàn (SAFE hoặc mực nước = 0cm) tới 0.0 </li>
  *       </ul>
  *   </li>
  *   <li><b>Bước 2 — Đồng thuận đám đông:</b> Đếm số {@code USER_REPORT} active lân cận
