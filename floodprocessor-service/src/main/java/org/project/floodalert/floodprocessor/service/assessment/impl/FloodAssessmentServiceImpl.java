@@ -33,14 +33,12 @@ public class FloodAssessmentServiceImpl implements FloodAssessmentService {
         }
 
 
-        List<ProcessedSensorData> processedList = enrichedDataList.stream()
+        // Log thống kê
+//        logProcessingStatistics(processedList);
+
+        return enrichedDataList.stream()
                 .map(this::assessFloodStatus)
                 .toList();
-
-        // Log thống kê
-        logProcessingStatistics(processedList);
-
-        return processedList;
     }
 
     @Override
