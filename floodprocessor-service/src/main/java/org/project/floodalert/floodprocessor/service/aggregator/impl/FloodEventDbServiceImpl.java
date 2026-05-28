@@ -62,6 +62,7 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
     }
 
 
+    @Override
     @Transactional
     public List<FloodEventDbResult> processAndSaveBatch(List<ProcessedSensorData> dataList) {
         if (dataList == null || dataList.isEmpty()) {
@@ -293,19 +294,19 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
             Map<String, IoTReading> readingMap = readings.stream()
                     .collect(Collectors.toMap(IoTReading::getReadingId, r -> r));
 
-            int updateCount = 0;
+            List<IoTReading> modifiedReadings = new ArrayList<>();
             for (BackLinkTask task : tasks) {
                 IoTReading reading = readingMap.get(task.readingId);
                 if (reading != null) {
                     reading.setFloodEventId(task.floodEvent.getId());
-                    updateCount++;
+                    modifiedReadings.add(reading);
                 } else {
                     log.warn("Không tìm thấy IoTReading với readingId: {}", task.readingId);
                 }
             }
 
-            if (updateCount > 0) {
-                iotReadingRepository.saveAll(readings);
+            if (!modifiedReadings.isEmpty()) {
+                iotReadingRepository.saveAll(modifiedReadings);
             }
 
         } catch (Exception e) {

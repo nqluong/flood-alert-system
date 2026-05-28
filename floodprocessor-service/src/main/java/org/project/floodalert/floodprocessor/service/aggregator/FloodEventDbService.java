@@ -4,6 +4,8 @@ import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
 
+import java.util.List;
+
 /**
  * - Tra cứu sự kiện active của sensor
  * - Xử lý 3 kịch bản: Nước rút (A), Ngập mới (B), Ngập kéo dài (C)
@@ -21,6 +23,15 @@ public interface FloodEventDbService {
      * @return kết quả gồm FloodEvent đã lưu, loại lifecycle event, và cờ có nên publish không
      */
     FloodEventDbResult processAndSave(ProcessedSensorData data);
+
+    /**
+     * Phiên bản batch-optimized của {@link #processAndSave}: xử lý toàn bộ danh sách sensor
+     * trong một transaction, với 1 query đọc active events và 1 lần saveAll.
+     *
+     * @param dataList danh sách dữ liệu sensor đã qua xử lý
+     * @return danh sách kết quả theo thứ tự tương ứng với dataList
+     */
+    List<FloodEventDbResult> processAndSaveBatch(List<ProcessedSensorData> dataList);
 
     /**
      * Record chứa kết quả sau khi xử lý DB.

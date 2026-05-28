@@ -8,6 +8,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 @Slf4j
@@ -54,5 +55,15 @@ public class LifecycleEventPublisherImpl implements LifecycleEventPublisher {
 
         log.debug("Đã đặt lịch gửi Lifecycle Event [{}] type [{}] lên topic [{}]",
                 event.getEventId(), event.getType(), lifecycleTopic);
+    }
+
+    @Override
+    public void publishAll(List<FloodLifecycleEvent> events) {
+        if (events == null || events.isEmpty()) {
+            return;
+        }
+        events.forEach(this::publish);
+        log.debug("Batch publish: đã đặt lịch gửi {} lifecycle events lên topic [{}]",
+                events.size(), lifecycleTopic);
     }
 }

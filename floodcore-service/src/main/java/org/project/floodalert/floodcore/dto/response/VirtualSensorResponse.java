@@ -31,4 +31,10 @@ public class VirtualSensorResponse {
     
     @JsonProperty("status")
     private String status;
+
+    @JsonProperty("warning_threshold")
+    private BigDecimal warningThreshold;
+
+    @JsonProperty("danger_threshold")
+    private BigDecimal dangerThreshold;
 }

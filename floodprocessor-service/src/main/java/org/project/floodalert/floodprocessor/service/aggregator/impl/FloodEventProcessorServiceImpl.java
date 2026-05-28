@@ -40,32 +40,26 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
         log.debug("Bắt đầu xử lý batch {} sensors với batch optimization", dataList.size());
 
         try {
-            List<FloodEventDbResult> results =
-                    ((FloodEventDbServiceImpl) floodEventDbService).processAndSaveBatch(dataList);
+            List<FloodEventDbResult> results = floodEventDbService.processAndSaveBatch(dataList);
 
             List<FloodLifecycleEvent> eventsToPublish = new ArrayList<>();
-            
+
             for (int i = 0; i < results.size(); i++) {
                 FloodEventDbResult result = results.get(i);
                 ProcessedSensorData data = dataList.get(i);
-                
+
                 if (result.shouldPublish() && result.floodEvent() != null) {
-                    FloodLifecycleEvent lifecycleEvent = 
-                            buildLifecycleEvent(result.floodEvent(), result);
-                    eventsToPublish.add(lifecycleEvent);
+                    eventsToPublish.add(buildLifecycleEvent(result.floodEvent(), result));
                 }
-                
+
                 log.debug("Hoàn thành xử lý aggregator cho sensor [{}], sự kiện [{}], type [{}]",
-                        data.getSensorId(), 
+                        data.getSensorId(),
                         result.floodEvent() != null ? result.floodEvent().getEventId() : "null",
                         result.lifecycleEventType());
             }
 
-            // Batch publish Kafka events
             if (!eventsToPublish.isEmpty()) {
-                for (FloodLifecycleEvent event : eventsToPublish) {
-                    lifecycleEventPublisher.publish(event);
-                }
+                lifecycleEventPublisher.publishAll(eventsToPublish);
                 log.debug("Batch publish: Gửi {} lifecycle events ra Kafka", eventsToPublish.size());
             }
 

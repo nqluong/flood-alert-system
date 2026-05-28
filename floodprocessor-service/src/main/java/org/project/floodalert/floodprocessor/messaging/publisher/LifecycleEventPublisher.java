@@ -2,6 +2,8 @@ package org.project.floodalert.floodprocessor.messaging.publisher;
 
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
 
+import java.util.List;
+
 /**
  * Service chịu trách nhiệm bắn Lifecycle Event ra Kafka topic "flood-lifecycle-events".
  * Admin service và Notification service sẽ lắng nghe topic này để xử lý tiếp.
@@ -20,4 +22,11 @@ public interface LifecycleEventPublisher {
      * @param event sự kiện vòng đời cần publish
      */
     void publish(FloodLifecycleEvent event);
+
+    /**
+     * Phiên bản batch của {@link #publish}: bắn toàn bộ danh sách trong một lần gọi.
+     *
+     * @param events danh sách sự kiện cần publish
+     */
+    void publishAll(List<FloodLifecycleEvent> events);
 }

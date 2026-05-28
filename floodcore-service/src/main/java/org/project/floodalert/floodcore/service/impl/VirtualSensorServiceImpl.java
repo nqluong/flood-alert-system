@@ -257,6 +257,8 @@ public class VirtualSensorServiceImpl implements VirtualSensorService {
                 .lon(sensor.getLon())
                 .name(sensor.getName())
                 .status(sensor.getStatus())
+                .warningThreshold(sensor.getWarningThreshold())
+                .dangerThreshold(sensor.getDangerThreshold())
                 .build();
     }
 

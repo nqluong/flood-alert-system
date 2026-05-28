@@ -5,12 +5,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
 import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.enums.FloodStatus;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.messaging.publisher.LifecycleEventPublisher;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
+import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService.FloodEventDbResult;
 
 import java.math.BigDecimal;
@@ -20,14 +20,13 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class FloodEventProcessorServiceImplTest {
     @Mock
-    private FloodEventDbServiceImpl floodEventDbService;
+    private FloodEventDbService floodEventDbService;
 
     @Mock
     private LifecycleEventPublisher lifecycleEventPublisher;
@@ -80,42 +79,39 @@ class FloodEventProcessorServiceImplTest {
     void processBatch_withCreatedEvent_publishesLifecycleEvent() {
         ProcessedSensorData data = buildData("SENSOR-001", FloodStatus.WARNING);
         FloodEvent event = buildFloodEvent("SENSOR-001", "WARNING");
-        FloodEventDbResult result =
-                new FloodEventDbResult(event, LifecycleEventType.CREATED, true, 150.0, "WARNING");
+        FloodEventDbResult result = new FloodEventDbResult(event, LifecycleEventType.CREATED, true, 150.0, "WARNING");
 
         when(floodEventDbService.processAndSaveBatch(anyList())).thenReturn(List.of(result));
 
         service.processBatch(List.of(data));
 
-        verify(lifecycleEventPublisher).publish(any(FloodLifecycleEvent.class));
+        verify(lifecycleEventPublisher).publishAll(anyList());
     }
 
     @Test
     void processBatch_withResolvedEvent_publishesLifecycleEvent() {
         ProcessedSensorData data = buildData("SENSOR-001", FloodStatus.SAFE);
         FloodEvent event = buildFloodEvent("SENSOR-001", "WARNING");
-        FloodEventDbResult result =
-                new FloodEventDbResult(event, LifecycleEventType.RESOLVED, true, 120.0, "WARNING");
+        FloodEventDbResult result = new FloodEventDbResult(event, LifecycleEventType.RESOLVED, true, 120.0, "WARNING");
 
         when(floodEventDbService.processAndSaveBatch(anyList())).thenReturn(List.of(result));
 
         service.processBatch(List.of(data));
 
-        verify(lifecycleEventPublisher).publish(any(FloodLifecycleEvent.class));
+        verify(lifecycleEventPublisher).publishAll(anyList());
     }
 
     @Test
     void processBatch_withEscalatedEvent_publishesLifecycleEvent() {
         ProcessedSensorData data = buildData("SENSOR-001", FloodStatus.DANGER);
         FloodEvent event = buildFloodEvent("SENSOR-001", "DANGER");
-        FloodEventDbResult result =
-                new FloodEventDbResult(event, LifecycleEventType.ESCALATED, true, 200.0, "DANGER");
+        FloodEventDbResult result = new FloodEventDbResult(event, LifecycleEventType.ESCALATED, true, 200.0, "DANGER");
 
         when(floodEventDbService.processAndSaveBatch(anyList())).thenReturn(List.of(result));
 
         service.processBatch(List.of(data));
 
-        verify(lifecycleEventPublisher).publish(any(FloodLifecycleEvent.class));
+        verify(lifecycleEventPublisher).publishAll(anyList());
     }
 
     @Test
@@ -147,8 +143,7 @@ class FloodEventProcessorServiceImplTest {
     void processBatch_floodEventNull_doesNotPublishEvenIfShouldPublishTrue() {
         ProcessedSensorData data = buildData("SENSOR-001", FloodStatus.WARNING);
         // Defensive: shouldPublish=true but floodEvent=null should not publish
-        FloodEventDbResult result =
-                new FloodEventDbResult(null, LifecycleEventType.CREATED, true, null, null);
+        FloodEventDbResult result = new FloodEventDbResult(null, LifecycleEventType.CREATED, true, null, null);
 
         when(floodEventDbService.processAndSaveBatch(anyList())).thenReturn(List.of(result));
 
@@ -173,7 +168,7 @@ class FloodEventProcessorServiceImplTest {
 
         service.processBatch(List.of(d1, d2, d3));
 
-        verify(lifecycleEventPublisher, times(2)).publish(any(FloodLifecycleEvent.class));
+        verify(lifecycleEventPublisher).publishAll(argThat(events -> events.size() == 2));
     }
 
     @Test
@@ -192,12 +187,11 @@ class FloodEventProcessorServiceImplTest {
     void processBatch_whenPublishThrows_doesNotPropagateException() {
         ProcessedSensorData data = buildData("SENSOR-001", FloodStatus.WARNING);
         FloodEvent event = buildFloodEvent("SENSOR-001", "WARNING");
-        FloodEventDbResult result =
-                new FloodEventDbResult(event, LifecycleEventType.CREATED, true, 150.0, "WARNING");
+        FloodEventDbResult result = new FloodEventDbResult(event, LifecycleEventType.CREATED, true, 150.0, "WARNING");
 
         when(floodEventDbService.processAndSaveBatch(anyList())).thenReturn(List.of(result));
-        // publish() is called inside a non-try-catch loop, so exception propagates to outer catch
-        doThrow(new RuntimeException("Kafka error")).when(lifecycleEventPublisher).publish(any());
+        // publishAll() propagates exception to outer catch in processBatch
+        doThrow(new RuntimeException("Kafka error")).when(lifecycleEventPublisher).publishAll(anyList());
 
         assertThatCode(() -> service.processBatch(List.of(data))).doesNotThrowAnyException();
     }
