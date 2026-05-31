@@ -7,6 +7,9 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.project.floodalert.ingestion.service.MessageProcessingService;
 import org.springframework.stereotype.Component;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -14,15 +17,17 @@ public class SensorTelemetryListener implements IMqttMessageListener {
 
     private final MessageProcessingService messageProcessingService;
 
-    @Override
-    public void messageArrived(String topic, MqttMessage mqttMessage) throws Exception {
-        try {
-            String payload = new String(mqttMessage.getPayload());
-            messageProcessingService.process(topic, payload);
-        } catch (Exception e) {
-            log.error("Error in MQTT message listener - topic: {}, error: {}",
-                    topic, e.getMessage(), e);
-        }
+    private final Executor virtualThreadExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
+    @Override
+    public void messageArrived(String topic, MqttMessage mqttMessage) {
+        String payload = new String(mqttMessage.getPayload());
+        virtualThreadExecutor.execute(() -> {
+            try {
+                messageProcessingService.process(topic, payload);
+            } catch (Exception e) {
+                log.error("Error processing MQTT message - topic: {}, error: {}", topic, e.getMessage(), e);
+            }
+        });
     }
 }

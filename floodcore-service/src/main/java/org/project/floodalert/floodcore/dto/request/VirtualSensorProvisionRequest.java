@@ -16,6 +16,5 @@ public class VirtualSensorProvisionRequest {
     
     @NotNull(message = "target_count không được null")
     @Min(value = 1, message = "target_count phải >= 1")
-    @Max(value = 1000, message = "target_count không được vượt quá 1000")
     private Integer targetCount;
 }

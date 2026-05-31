@@ -23,6 +23,9 @@ public interface IotReadingRepository extends JpaRepository<IoTReading, UUID> {
             @Param("floodEventId") java.util.UUID floodEventId,
             @Param("readingId") String readingId);
 
-    @Query("SELECT r FROM IoTReading r WHERE r.readingId IN :readingIds")
-    List<IoTReading> findAllByReadingIds(@Param("readingIds") List<String> readingIds);
+    @Modifying
+    @Query("UPDATE IoTReading r SET r.floodEventId = :floodEventId WHERE r.readingId IN :readingIds")
+    void batchUpdateFloodEventIdByReadingIds(
+            @Param("floodEventId") java.util.UUID floodEventId,
+            @Param("readingIds") List<String> readingIds);
 }

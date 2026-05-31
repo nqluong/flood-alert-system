@@ -6,7 +6,6 @@ import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.enums.FloodStatus;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
-import org.project.floodalert.floodprocessor.model.IoTReading;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
 import org.project.floodalert.floodprocessor.repository.IotReadingRepository;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService;
@@ -284,49 +283,25 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
             return;
         }
 
-        try {
-            List<String> readingIds = tasks.stream()
-                    .map(BackLinkTask::readingId)
-                    .toList();
-
-            List<IoTReading> readings = iotReadingRepository.findAllByReadingIds(readingIds);
-
-            Map<String, IoTReading> readingMap = readings.stream()
-                    .collect(Collectors.toMap(IoTReading::getReadingId, r -> r));
-
-            List<IoTReading> modifiedReadings = new ArrayList<>();
-            for (BackLinkTask task : tasks) {
-                IoTReading reading = readingMap.get(task.readingId);
-                if (reading != null) {
-                    reading.setFloodEventId(task.floodEvent.getId());
-                    modifiedReadings.add(reading);
-                } else {
-                    log.warn("Không tìm thấy IoTReading với readingId: {}", task.readingId);
-                }
-            }
-
-            if (!modifiedReadings.isEmpty()) {
-                iotReadingRepository.saveAll(modifiedReadings);
-            }
-
-        } catch (Exception e) {
-            log.error("Lỗi batch back-link, fallback sang update từng record: {}", e.getMessage());
-            
-            int successCount = 0;
-            for (BackLinkTask task : tasks) {
-                try {
-                    iotReadingRepository.updateFloodEventIdByReadingId(
-                            task.floodEvent.getId(), 
-                            task.readingId
-                    );
-                    successCount++;
-                } catch (Exception ex) {
-                    log.warn("Back-link thất bại cho reading [{}]: {}", 
-                            task.readingId, ex.getMessage());
-                }
-            }
-            log.debug("Fallback back-link: {}/{} thành công", successCount, tasks.size());
+        Map<UUID, List<String>> readingsByFloodEventId = new LinkedHashMap<>();
+        for (BackLinkTask task : tasks) {
+            readingsByFloodEventId
+                    .computeIfAbsent(task.floodEvent.getId(), k -> new ArrayList<>())
+                    .add(task.readingId);
         }
+
+        int successCount = 0;
+        for (Map.Entry<UUID, List<String>> entry : readingsByFloodEventId.entrySet()) {
+            try {
+                iotReadingRepository.batchUpdateFloodEventIdByReadingIds(entry.getKey(), entry.getValue());
+                successCount += entry.getValue().size();
+            } catch (Exception e) {
+                log.error("Back-link thất bại cho flood_event [{}], {} readings: {}",
+                        entry.getKey(), entry.getValue().size(), e.getMessage());
+            }
+        }
+
+        log.debug("Batch back-link: {}/{} readings thành công", successCount, tasks.size());
     }
 
     private String generateEventId(String sensorId) {

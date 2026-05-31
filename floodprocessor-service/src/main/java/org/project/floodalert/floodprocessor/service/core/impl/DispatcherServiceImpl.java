@@ -6,6 +6,7 @@ import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.mapper.IotReadingMapper;
 import org.project.floodalert.floodprocessor.messaging.publisher.KafkaDispatcher;
 import org.project.floodalert.floodprocessor.model.IoTReading;
+import org.project.floodalert.floodprocessor.service.aggregator.FloodEventProcessorService;
 import org.project.floodalert.floodprocessor.service.core.DispatcherService;
 import org.project.floodalert.floodprocessor.service.persistence.DatabasePersister;
 import org.project.floodalert.floodprocessor.service.processing.SensorHealthThrottlingService;
@@ -22,6 +23,7 @@ public class DispatcherServiceImpl implements DispatcherService {
     private final DatabasePersister databasePersister;
     private final KafkaDispatcher kafkaDispatcher;
     private final SensorHealthThrottlingService sensorHealthThrottlingService;
+    private final FloodEventProcessorService floodEventProcessorService;
 
     @Override
     public void dispatch(List<ProcessedSensorData> processedSensorDataList) {
@@ -32,6 +34,7 @@ public class DispatcherServiceImpl implements DispatcherService {
         List<IoTReading> entities = iotReadingMapper.toEntities(processedSensorDataList);
         databasePersister.batchSave(entities);
         dispatchToKafka(processedSensorDataList);
+        floodEventProcessorService.processBatch(processedSensorDataList);
         syncSensorHealth(processedSensorDataList);
     }
 

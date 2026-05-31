@@ -9,7 +9,6 @@ import org.project.floodalert.floodprocessor.dto.response.ProcessedSensorData;
 import org.project.floodalert.floodprocessor.enums.FloodStatus;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
-import org.project.floodalert.floodprocessor.model.IoTReading;
 import org.project.floodalert.floodprocessor.repository.FloodEventRepository;
 import org.project.floodalert.floodprocessor.repository.IotReadingRepository;
 import org.project.floodalert.floodprocessor.service.aggregator.FloodEventDbService.FloodEventDbResult;
@@ -322,67 +321,59 @@ class FloodEventDbServiceImplTest {
     }
 
     @Test
-    void processAndSaveBatch_withReadingId_findAllByReadingIdsCalled() {
+    void processAndSaveBatch_withReadingId_batchUpdateCalled() {
         ProcessedSensorData data = buildDataWithReadingId(FloodStatus.WARNING, "READING-001");
 
         when(floodEventRepository.findActiveEventsBySensorIds(anyList(), any()))
                 .thenReturn(Collections.emptyList());
         when(floodEventRepository.saveAll(any())).thenReturn(Collections.emptyList());
 
-        IoTReading reading = IoTReading.builder()
-                .id(UUID.randomUUID()).readingId("READING-001").sensorId("SENSOR-001").build();
-        when(iotReadingRepository.findAllByReadingIds(anyList())).thenReturn(List.of(reading));
-        when(iotReadingRepository.saveAll(any())).thenReturn(Collections.emptyList());
-
         service.processAndSaveBatch(List.of(data));
 
-        verify(iotReadingRepository).findAllByReadingIds(List.of("READING-001"));
-        verify(iotReadingRepository).saveAll(any());
+        verify(iotReadingRepository).batchUpdateFloodEventIdByReadingIds(
+                any(UUID.class), eq(List.of("READING-001")));
     }
 
     @Test
-    void processAndSaveBatch_readingNotFound_iotSaveAllNotCalled() {
+    void processAndSaveBatch_withReadingId_batchUpdateCalledEvenIfReadingMissing() {
+        // DB xử lý gracefully — UPDATE chỉ ảnh hưởng 0 rows nếu reading không tồn tại
         ProcessedSensorData data = buildDataWithReadingId(FloodStatus.WARNING, "READING-MISSING");
 
         when(floodEventRepository.findActiveEventsBySensorIds(anyList(), any()))
                 .thenReturn(Collections.emptyList());
         when(floodEventRepository.saveAll(any())).thenReturn(Collections.emptyList());
-        when(iotReadingRepository.findAllByReadingIds(anyList()))
-                .thenReturn(Collections.emptyList());
 
         service.processAndSaveBatch(List.of(data));
 
-        verify(iotReadingRepository, never()).saveAll(any());
+        verify(iotReadingRepository).batchUpdateFloodEventIdByReadingIds(
+                any(UUID.class), eq(List.of("READING-MISSING")));
     }
 
     @Test
-    void processAndSaveBatch_batchBackLinkThrows_fallsBackToIndividualUpdate() {
+    void processAndSaveBatch_batchBackLinkThrows_continuesGracefully() {
         ProcessedSensorData data = buildDataWithReadingId(FloodStatus.WARNING, "READING-001");
 
         when(floodEventRepository.findActiveEventsBySensorIds(anyList(), any()))
                 .thenReturn(Collections.emptyList());
         when(floodEventRepository.saveAll(any())).thenReturn(Collections.emptyList());
-        when(iotReadingRepository.findAllByReadingIds(anyList()))
-                .thenThrow(new RuntimeException("DB error"));
+        doThrow(new RuntimeException("DB error"))
+                .when(iotReadingRepository).batchUpdateFloodEventIdByReadingIds(any(), anyList());
 
         service.processAndSaveBatch(List.of(data));
 
-        verify(iotReadingRepository).updateFloodEventIdByReadingId(isNull(), eq("READING-001"));
+        verify(iotReadingRepository, never()).updateFloodEventIdByReadingId(any(), anyString());
     }
 
     @Test
-    void processAndSaveBatch_batchBackLinkFallback_fallbackThrows_continuesGracefully() {
+    void processAndSaveBatch_batchBackLinkThrows_resultStillReturned() {
         ProcessedSensorData data = buildDataWithReadingId(FloodStatus.WARNING, "READING-001");
 
         when(floodEventRepository.findActiveEventsBySensorIds(anyList(), any()))
                 .thenReturn(Collections.emptyList());
         when(floodEventRepository.saveAll(any())).thenReturn(Collections.emptyList());
-        when(iotReadingRepository.findAllByReadingIds(anyList()))
-                .thenThrow(new RuntimeException("batch error"));
-        doThrow(new RuntimeException("individual error"))
-                .when(iotReadingRepository).updateFloodEventIdByReadingId(any(), anyString());
+        doThrow(new RuntimeException("batch error"))
+                .when(iotReadingRepository).batchUpdateFloodEventIdByReadingIds(any(), anyList());
 
-        // Should not propagate — each individual failure is caught and logged
         List<FloodEventDbResult> results = service.processAndSaveBatch(List.of(data));
 
         assertThat(results).hasSize(1);
