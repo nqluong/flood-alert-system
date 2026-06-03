@@ -30,7 +30,7 @@ public class KafkaConfig {
         config.put(JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
         config.put(ProducerConfig.BATCH_SIZE_CONFIG, 65536);
         config.put(ProducerConfig.LINGER_MS_CONFIG, 5);
-        config.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "snappy");
+        config.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, "lz4");
         config.put(ProducerConfig.BUFFER_MEMORY_CONFIG, 67108864);
 
         return new DefaultKafkaProducerFactory<>(config);

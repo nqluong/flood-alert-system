@@ -138,6 +138,33 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
         log.info("[ADMIN-REJECTION] Hoàn tất từ chối flood event: eventId={}", eventId);
     }
 
+    @Override
+    @Transactional
+    public void dismissEvent(String eventId) {
+        log.info("[ADMIN-DISMISS] Bắt đầu xóa flood event: eventId={}", eventId);
+
+        FloodEvent event = findFloodEventByEventId(eventId);
+        event.setStatus("RESOLVED");
+        floodEventRepository.save(event);
+        log.info("[ADMIN-DISMISS] Đã update event status=RESOLVED: eventId={}", eventId);
+
+        FloodLifecycleEvent lifecycleEvent = FloodLifecycleEvent.builder()
+                .eventId(eventId)
+                .type(LifecycleEventType.RESOLVED)
+                .waterLevel(event.getWaterLevel() != null ? event.getWaterLevel().doubleValue() : null)
+                .severityLevel(event.getSeverityLevel())
+                .location(event.getLocationDescription())
+                .lat(event.getLat())
+                .lon(event.getLon())
+                .source(event.getSource())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        lifecyclePublisher.publish(lifecycleEvent);
+        log.info("[ADMIN-DISMISS] Đã bắn Lifecycle Event RESOLVED cho eventId={}", eventId);
+        log.info("[ADMIN-DISMISS] Hoàn tất xóa flood event: eventId={}", eventId);
+    }
+
     private FloodEvent findFloodEventByEventId(String eventId) {
         return floodEventRepository.findByEventId(eventId)
                 .orElseThrow(() -> {

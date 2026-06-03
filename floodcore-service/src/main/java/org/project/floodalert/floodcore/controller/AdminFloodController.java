@@ -8,6 +8,7 @@ import org.project.floodalert.floodcore.service.AdminFloodService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -75,6 +76,25 @@ public class AdminFloodController {
                 .code(HttpStatus.OK.value())
                 .success(true)
                 .message("Flood event rejected successfully")
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+
+    /**
+     * Admin xóa (gỡ bỏ) một điểm ngập khỏi bản đồ theo eventId.
+     * Dùng khi phát hiện điểm ngập không chính xác cần gỡ bỏ.
+     */
+    @DeleteMapping("/events/{eventId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> dismissFloodEvent(@PathVariable(name = "eventId") String eventId) {
+        log.info("[ADMIN-FLOOD-CONTROLLER] Admin xóa điểm ngập: eventId={}", eventId);
+
+        adminFloodService.dismissFlood(eventId);
+
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .code(HttpStatus.OK.value())
+                .success(true)
+                .message("Flood event dismissed successfully")
                 .timestamp(LocalDateTime.now())
                 .build());
     }

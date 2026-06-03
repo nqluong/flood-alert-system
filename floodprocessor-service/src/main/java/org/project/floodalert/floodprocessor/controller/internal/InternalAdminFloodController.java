@@ -6,6 +6,7 @@ import org.project.floodalert.common.dto.response.ApiResponse;
 import org.project.floodalert.floodprocessor.service.admin.AdminApprovalService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -69,6 +70,32 @@ public class InternalAdminFloodController {
                 .code(HttpStatus.OK.value())
                 .success(true)
                 .message("Flood event rejected successfully")
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+
+    /**
+     * Internal API: Admin xóa (gỡ bỏ) điểm ngập khỏi bản đồ.
+     * <p>
+     * Logic:
+     * - Update status = RESOLVED
+     * - Bắn Lifecycle Event RESOLVED → xóa CoreActiveFlood + Redis cache
+     * - Không phạt điểm contributors
+     *
+     * @param eventId ID của flood event cần gỡ bỏ
+     * @return ApiResponse xác nhận xóa thành công
+     */
+    @DeleteMapping("/{eventId}")
+    public ResponseEntity<ApiResponse<Void>> dismissFloodEvent(@PathVariable(name = "eventId") String eventId) {
+        log.info("[INTERNAL-ADMIN-CONTROLLER] Nhận request xóa flood event: eventId={}", eventId);
+
+        adminApprovalService.dismissEvent(eventId);
+
+        log.info("[INTERNAL-ADMIN-CONTROLLER] Đã xóa thành công flood event: eventId={}", eventId);
+        return ResponseEntity.ok(ApiResponse.<Void>builder()
+                .code(HttpStatus.OK.value())
+                .success(true)
+                .message("Flood event dismissed successfully")
                 .timestamp(LocalDateTime.now())
                 .build());
     }

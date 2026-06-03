@@ -2,6 +2,7 @@ package org.project.floodalert.floodcore.client;
 
 import org.project.floodalert.common.dto.response.ApiResponse;
 import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
@@ -32,4 +33,15 @@ public interface FloodProcessorClient {
      */
     @PostMapping("/internal/api/v1/admin/floods/{eventId}/reject")
     ApiResponse<Void> rejectFloodEvent(@PathVariable("eventId") String eventId);
+
+    /**
+     * Admin xóa (gỡ bỏ) điểm ngập khỏi bản đồ.
+     * Update status = RESOLVED, bắn Lifecycle Event RESOLVED.
+     * Không phạt điểm contributors.
+     *
+     * @param eventId ID của flood event cần gỡ bỏ
+     * @return ApiResponse xác nhận xóa thành công
+     */
+    @DeleteMapping("/internal/api/v1/admin/floods/{eventId}")
+    ApiResponse<Void> dismissFloodEvent(@PathVariable("eventId") String eventId);
 }

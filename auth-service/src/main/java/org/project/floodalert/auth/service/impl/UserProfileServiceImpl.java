@@ -78,6 +78,7 @@ public class UserProfileServiceImpl implements UserProfileService {
                 .phone(user.getPhone())
                 .avatarUrl(profile.getAvatarUrl())
                 .status(user.getStatus().toString())
+                .reputationScore(profile.getReputationScore())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
                 .lastLoginAt(user.getLastLoginAt())

@@ -28,4 +28,16 @@ public interface AdminApprovalService {
      * @param eventId ID của flood event (eventId, không phải UUID)
      */
     void rejectEvent(String eventId);
+
+    /**
+     * Admin xóa (gỡ bỏ) một điểm ngập đang hiển thị trên bản đồ.
+     * <p>
+     * Logic:
+     * - Update status = RESOLVED
+     * - Bắn Kafka Lifecycle Event: RESOLVED (kích hoạt xóa CoreActiveFlood + cache)
+     * - Không phạt điểm contributors (lỗi do hệ thống phát hiện sai, không phải người dùng)
+     *
+     * @param eventId ID của flood event cần gỡ bỏ
+     */
+    void dismissEvent(String eventId);
 }

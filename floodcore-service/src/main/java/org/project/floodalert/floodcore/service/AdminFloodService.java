@@ -8,4 +8,5 @@ public interface AdminFloodService {
     List<AdminActiveFloodResponse> getAllActiveFloods();
     void approveReport(UUID userReportId);
     void rejectReport(UUID userReportId);
+    void dismissFlood(String eventId);
 }

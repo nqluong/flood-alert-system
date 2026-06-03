@@ -17,6 +17,7 @@ public class UserProfileResponse {
     String phone;
     String avatarUrl;
     String status;
+    Integer reputationScore;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;
     LocalDateTime lastLoginAt;

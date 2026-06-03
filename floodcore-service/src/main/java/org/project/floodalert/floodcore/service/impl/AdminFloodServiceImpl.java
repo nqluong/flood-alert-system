@@ -37,32 +37,6 @@ public class AdminFloodServiceImpl implements AdminFloodService {
 
     @Override
     public void approveReport(UUID userReportId) {
-        String floodEventId = resolveFloodEventId(userReportId);
-        log.info("[ADMIN-FLOOD-SERVICE] Approve report: userReportId={}, floodEventId={}", userReportId, floodEventId);
-        floodProcessorClient.approveFloodEvent(floodEventId);
-    }
-
-    @Override
-    public void rejectReport(UUID userReportId) {
-        UserReport report = userReportRepository.findById(userReportId)
-                .orElseThrow(() -> new AppException(CoreErrorCode.USER_REPORT_NOT_FOUND,
-                        "Không tìm thấy báo cáo: " + userReportId));
-
-        if (report.getFloodEventId() == null) {
-            log.info("[ADMIN-FLOOD-SERVICE] Reject report (no floodEventId): userReportId={}", userReportId);
-            report.setStatus("REJECTED");
-            report.setRejectReason("Bị từ chối bởi admin");
-            report.setReviewedAt(java.time.LocalDateTime.now());
-            userReportRepository.save(report);
-            return;
-        }
-
-        String floodEventId = report.getFloodEventId();
-        log.info("[ADMIN-FLOOD-SERVICE] Reject report: userReportId={}, floodEventId={}", userReportId, floodEventId);
-        floodProcessorClient.rejectFloodEvent(floodEventId);
-    }
-
-    private String resolveFloodEventId(UUID userReportId) {
         UserReport report = userReportRepository.findById(userReportId)
                 .orElseThrow(() -> new AppException(CoreErrorCode.USER_REPORT_NOT_FOUND,
                         "Không tìm thấy báo cáo: " + userReportId));
@@ -72,7 +46,45 @@ public class AdminFloodServiceImpl implements AdminFloodService {
                     "Báo cáo chưa được xử lý bởi hệ thống, vui lòng thử lại sau");
         }
 
-        return report.getFloodEventId();
+        String floodEventId = report.getFloodEventId();
+        log.info("[ADMIN-FLOOD-SERVICE] Approve report: userReportId={}, floodEventId={}", userReportId, floodEventId);
+
+        floodProcessorClient.approveFloodEvent(floodEventId);
+
+        report.setStatus("APPROVED");
+        report.setReviewedAt(LocalDateTime.now());
+        userReportRepository.save(report);
+        log.info("[ADMIN-FLOOD-SERVICE] Đã cập nhật UserReport status=APPROVED: userReportId={}", userReportId);
+    }
+
+    @Override
+    public void rejectReport(UUID userReportId) {
+        UserReport report = userReportRepository.findById(userReportId)
+                .orElseThrow(() -> new AppException(CoreErrorCode.USER_REPORT_NOT_FOUND,
+                        "Không tìm thấy báo cáo: " + userReportId));
+
+        report.setStatus("REJECTED");
+        report.setRejectReason("Bị từ chối bởi admin");
+        report.setReviewedAt(LocalDateTime.now());
+
+        if (report.getFloodEventId() == null) {
+            log.info("[ADMIN-FLOOD-SERVICE] Reject report (no floodEventId): userReportId={}", userReportId);
+            userReportRepository.save(report);
+            return;
+        }
+
+        String floodEventId = report.getFloodEventId();
+        log.info("[ADMIN-FLOOD-SERVICE] Reject report: userReportId={}, floodEventId={}", userReportId, floodEventId);
+        floodProcessorClient.rejectFloodEvent(floodEventId);
+        userReportRepository.save(report);
+        log.info("[ADMIN-FLOOD-SERVICE] Đã cập nhật UserReport status=REJECTED: userReportId={}", userReportId);
+    }
+
+    @Override
+    public void dismissFlood(String eventId) {
+        log.info("[ADMIN-FLOOD-SERVICE] Admin xóa điểm ngập: eventId={}", eventId);
+        floodProcessorClient.dismissFloodEvent(eventId);
+        log.info("[ADMIN-FLOOD-SERVICE] Đã gửi yêu cầu xóa điểm ngập tới floodprocessor: eventId={}", eventId);
     }
 
     private AdminActiveFloodResponse mapToResponse(CoreActiveFlood entity) {

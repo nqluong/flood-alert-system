@@ -317,6 +317,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                 .type(type)
                                 .lat(event.getLat())
                                 .lon(event.getLon())
+                                .location(event.getLocationDescription())
+                                .severityLevel(event.getSeverityLevel())
+                                .waterLevel(event.getWaterLevel() != null ? event.getWaterLevel().doubleValue() : null)
                                 .build();
 
                 kafkaTemplate.send(lifecycleTopic, event.getEventId(), lifecycleEvent);
