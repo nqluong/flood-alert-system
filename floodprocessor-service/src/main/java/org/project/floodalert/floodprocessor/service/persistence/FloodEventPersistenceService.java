@@ -65,7 +65,7 @@ public class FloodEventPersistenceService {
             trustScoreRepository.save(trustScore);
 
             // AUTO-INSERT EventContributor: PIONEER (người báo cáo đầu tiên)
-            createContributor(savedEvent.getId(), msg.getUserId(), ContributorRole.PIONEER);
+            createContributor(savedEvent.getId(), msg.getUserId(), ContributorRole.PIONEER, msg.getReportId());
 
             return savedEvent;
 
@@ -147,7 +147,7 @@ public class FloodEventPersistenceService {
                     savedTrustScore.getId(), savedTrustScore.getFloodEventId(), savedTrustScore.getFinalScore());
 
             // Chỉ insert nếu chưa tồn tại để tránh duplicate
-            createContributor(updatedEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER);
+            createContributor(updatedEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER, msg.getReportId());
 
             return updatedEvent;
 
@@ -267,7 +267,7 @@ public class FloodEventPersistenceService {
                     String.format("%.6f", newLat), String.format("%.6f", newLon));
 
             // AUTO-INSERT EventContributor: VERIFIER (xác nhận cho event ACTIVE)
-            createContributor(existingEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER);
+            createContributor(existingEvent.getId(), msg.getUserId(), ContributorRole.VERIFIER, msg.getReportId());
 
             // Cập nhật image nếu có
             if (msg.getImageUrl() != null && !msg.getImageUrl().isBlank()) {
@@ -325,7 +325,7 @@ public class FloodEventPersistenceService {
      * Tạo EventContributor mới với duplicate check.
      * Nếu user đã contribute rồi, skip để tránh duplicate.
      */
-    private void createContributor(UUID floodEventId, UUID userId, ContributorRole role) {
+    private void createContributor(UUID floodEventId, UUID userId, ContributorRole role, String reportId) {
         try {
             // Check duplicate
             Optional<EventContributor> existing = eventContributorRepository
@@ -337,11 +337,11 @@ public class FloodEventPersistenceService {
                 return;
             }
 
-            // Tạo mới
             EventContributor contributor = EventContributor.builder()
                     .floodEventId(floodEventId)
                     .userId(userId)
                     .role(role.name()) // Convert enum to String
+                    .reportId(reportId)
                     .createdAt(LocalDateTime.now())
                     .build();
 

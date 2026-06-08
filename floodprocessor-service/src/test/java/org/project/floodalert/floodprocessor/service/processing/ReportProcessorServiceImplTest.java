@@ -6,8 +6,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
+import org.project.floodalert.floodprocessor.dto.event.ReportStatusUpdateEvent;
 import org.project.floodalert.floodprocessor.dto.request.UserReportEvent;
 import org.project.floodalert.floodprocessor.dto.response.ScoringResult;
+import org.project.floodalert.floodprocessor.messaging.publisher.ReportStatusEventPublisher;
 import org.project.floodalert.floodprocessor.messaging.publisher.ReputationEventPublisher;
 import org.project.floodalert.floodprocessor.model.EventContributor;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
@@ -23,7 +26,9 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +53,9 @@ class ReportProcessorServiceImplTest {
         private ReputationEventPublisher reputationEventPublisher;
 
         @Mock
+        private ReportStatusEventPublisher reportStatusEventPublisher;
+
+        @Mock
         private ValueOperations<String, String> valueOperations;
 
         @InjectMocks
@@ -56,7 +64,6 @@ class ReportProcessorServiceImplTest {
         @BeforeEach
         void setUp() {
                 ReflectionTestUtils.setField(service, "lifecycleTopic", "flood-lifecycle");
-                ReflectionTestUtils.setField(service, "reportStatusTopic", "report-status-update");
                 when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
         }
 
@@ -92,7 +99,13 @@ class ReportProcessorServiceImplTest {
         @Test
         void process_spam_rejectsImmediately() {
                 when(valueOperations.setIfAbsent(any(), any(), anyLong(), any())).thenReturn(false);
+
                 service.process(buildEvent());
+
+                ArgumentCaptor<ReportStatusUpdateEvent> captor = ArgumentCaptor.forClass(ReportStatusUpdateEvent.class);
+                verify(reportStatusEventPublisher).publish(captor.capture());
+                assertEquals("REJECTED", captor.getValue().getStatus());
+                assertEquals("report-001", captor.getValue().getReportId());
         }
 
         @Test
@@ -126,6 +139,11 @@ class ReportProcessorServiceImplTest {
                 when(persistenceService.handleNewReport(any(), anyDouble())).thenReturn(buildFloodEvent("ACTIVE"));
 
                 service.process(buildEvent());
+
+                ArgumentCaptor<ReportStatusUpdateEvent> captor = ArgumentCaptor.forClass(ReportStatusUpdateEvent.class);
+                verify(reportStatusEventPublisher).publish(captor.capture());
+                assertEquals("APPROVED", captor.getValue().getStatus());
+                assertEquals("evt-001", captor.getValue().getEventId());
         }
 
         @Test

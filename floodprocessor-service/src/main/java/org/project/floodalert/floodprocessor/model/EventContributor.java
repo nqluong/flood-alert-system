@@ -29,6 +29,9 @@ public class EventContributor {
     @Column(name = "role")
     String role;
 
+    @Column(name = "report_id", length = 50)
+    String reportId;
+
     @Column(name = "created_at")
     LocalDateTime createdAt;
 }

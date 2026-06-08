@@ -3,6 +3,7 @@ package org.project.floodalert.floodprocessor.service.persistence;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -21,8 +22,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -111,6 +114,17 @@ class FloodEventPersistenceServiceTest {
     void handleNewReport_scoreActive_savesActiveEvent() {
         stubHandleNewReport(buildSavedEvent("ACTIVE"));
         service.handleNewReport(buildMsg(), 0.9);
+    }
+
+    @Test
+    void handleNewReport_savesContributorWithReportIdFromMessage() {
+        stubHandleNewReport(buildSavedEvent("ACTIVE"));
+
+        service.handleNewReport(buildMsg(), 0.9);
+
+        ArgumentCaptor<EventContributor> captor = ArgumentCaptor.forClass(EventContributor.class);
+        verify(eventContributorRepository).save(captor.capture());
+        assertEquals("report-001", captor.getValue().getReportId());
     }
 
     @Test

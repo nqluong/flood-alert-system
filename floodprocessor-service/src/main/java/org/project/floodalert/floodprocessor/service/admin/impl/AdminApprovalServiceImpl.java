@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.project.floodalert.common.exception.AppException;
 import org.project.floodalert.floodprocessor.dto.event.FloodLifecycleEvent;
+import org.project.floodalert.floodprocessor.dto.event.ReportStatusUpdateEvent;
 import org.project.floodalert.floodprocessor.dto.event.ReputationUpdateEvent;
 import org.project.floodalert.floodprocessor.enums.ContributorRole;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.enums.ReputationReason;
 import org.project.floodalert.floodprocessor.exception.ProcessorErrorCode;
 import org.project.floodalert.floodprocessor.messaging.publisher.LifecycleEventPublisher;
+import org.project.floodalert.floodprocessor.messaging.publisher.ReportStatusEventPublisher;
 import org.project.floodalert.floodprocessor.messaging.publisher.ReputationEventPublisher;
 import org.project.floodalert.floodprocessor.model.EventContributor;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
@@ -37,10 +39,17 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
     private static final int VERIFIER_REWARD_POINTS = 2;
     private static final int REJECTION_PENALTY_POINTS = -10;
 
+    // Status đồng bộ ngược lại cho từng UserReport ở floodcore-service (qua ReportStatusUpdateEvent)
+    private static final String REPORT_STATUS_APPROVED = "APPROVED";
+    private static final String REPORT_STATUS_REJECTED = "REJECTED";
+    private static final String REPORT_STATUS_RESOLVED = "RESOLVED";
+    private static final String ADMIN_REJECT_REASON = "Admin đã từ chối khu vực ngập lụt này";
+
     private final FloodEventRepository floodEventRepository;
     private final FloodEventPersistenceService persistenceService;
     private final ReputationEventPublisher reputationPublisher;
     private final LifecycleEventPublisher lifecyclePublisher;
+    private final ReportStatusEventPublisher reportStatusEventPublisher;
 
     @Override
     @Transactional
@@ -81,6 +90,8 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
             log.info("[ADMIN-APPROVAL] Đã bắn Reputation Event: userId={}, role={}, points={}",
                     contributor.getUserId(), contributor.getRole(), rewardPoints);
         }
+
+        publishReportStatusUpdates(contributors, eventId, REPORT_STATUS_APPROVED, null);
 
         // Bắn Kafka Lifecycle Event: UPDATED
         FloodLifecycleEvent lifecycleEvent = FloodLifecycleEvent.builder()
@@ -135,6 +146,8 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                     contributor.getUserId(), REJECTION_PENALTY_POINTS);
         }
 
+        publishReportStatusUpdates(contributors, eventId, REPORT_STATUS_REJECTED, ADMIN_REJECT_REASON);
+
         log.info("[ADMIN-REJECTION] Hoàn tất từ chối flood event: eventId={}", eventId);
     }
 
@@ -147,6 +160,9 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
         event.setStatus("RESOLVED");
         floodEventRepository.save(event);
         log.info("[ADMIN-DISMISS] Đã update event status=RESOLVED: eventId={}", eventId);
+
+        List<EventContributor> contributors = persistenceService.getContributorsByEventId(event.getId());
+        publishReportStatusUpdates(contributors, eventId, REPORT_STATUS_RESOLVED, null);
 
         FloodLifecycleEvent lifecycleEvent = FloodLifecycleEvent.builder()
                 .eventId(eventId)
@@ -163,6 +179,30 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
         lifecyclePublisher.publish(lifecycleEvent);
         log.info("[ADMIN-DISMISS] Đã bắn Lifecycle Event RESOLVED cho eventId={}", eventId);
         log.info("[ADMIN-DISMISS] Hoàn tất xóa flood event: eventId={}", eventId);
+    }
+
+
+    private void publishReportStatusUpdates(List<EventContributor> contributors, String eventId,
+            String reportStatus, String rejectReason) {
+        for (EventContributor contributor : contributors) {
+            if (contributor.getReportId() == null) {
+                log.debug("[ADMIN-REVIEW] Contributor không có reportId (dữ liệu cũ), bỏ qua đồng bộ status: " +
+                        "floodEventId={}, userId={}", contributor.getFloodEventId(), contributor.getUserId());
+                continue;
+            }
+
+            ReportStatusUpdateEvent statusEvent = ReportStatusUpdateEvent.builder()
+                    .reportId(contributor.getReportId())
+                    .userId(contributor.getUserId())
+                    .status(reportStatus)
+                    .eventId(eventId)
+                    .rejectReason(rejectReason)
+                    .build();
+
+            reportStatusEventPublisher.publish(statusEvent);
+            log.info("[ADMIN-REVIEW] Đồng bộ status UserReport: reportId={}, userId={}, status={}, eventId={}",
+                    contributor.getReportId(), contributor.getUserId(), reportStatus, eventId);
+        }
     }
 
     private FloodEvent findFloodEventByEventId(String eventId) {

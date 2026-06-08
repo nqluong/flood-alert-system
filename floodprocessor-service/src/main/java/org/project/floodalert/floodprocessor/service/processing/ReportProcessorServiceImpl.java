@@ -11,6 +11,7 @@ import org.project.floodalert.floodprocessor.dto.response.ScoringResult;
 import org.project.floodalert.floodprocessor.enums.ContributorRole;
 import org.project.floodalert.floodprocessor.enums.LifecycleEventType;
 import org.project.floodalert.floodprocessor.enums.ReputationReason;
+import org.project.floodalert.floodprocessor.messaging.publisher.ReportStatusEventPublisher;
 import org.project.floodalert.floodprocessor.messaging.publisher.ReputationEventPublisher;
 import org.project.floodalert.floodprocessor.model.EventContributor;
 import org.project.floodalert.floodprocessor.model.FloodEvent;
@@ -51,12 +52,10 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
         private final StringRedisTemplate stringRedisTemplate;
         private final KafkaTemplate<String, Object> kafkaTemplate;
         private final ReputationEventPublisher reputationEventPublisher;
+        private final ReportStatusEventPublisher reportStatusEventPublisher;
 
         @Value("${app.kafka.topic.lifecycle}")
         private String lifecycleTopic;
-
-        @Value("${app.kafka.topic.report-status:report-status-update}")
-        private String reportStatusTopic;
 
         /**
          * Entry point: Xử lý UserReportEvent từ Kafka.
@@ -371,28 +370,18 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
         private void publishReportStatusEvent(ReportMessage msg, String status,
                         String eventId, String rejectReason, ScoringResult scoringResult) {
-                try {
-                        ReportStatusUpdateEvent event = ReportStatusUpdateEvent.builder()
-                                        .reportId(msg.getReportId())
-                                        .userId(msg.getUserId())
-                                        .status(status)
-                                        .eventId(eventId)
-                                        .rejectReason(rejectReason)
-                                        .score(scoringResult != null ? scoringResult.getTotalScore() : null)
-                                        .aiScore(scoringResult != null ? scoringResult.getAiScore() : null)
-                                        .spatialScore(scoringResult != null ? scoringResult.getSpatialScore() : null)
-                                        .reputationScore(scoringResult != null ? scoringResult.getReputationScore() : null)
-                                        .build();
+                ReportStatusUpdateEvent event = ReportStatusUpdateEvent.builder()
+                                .reportId(msg.getReportId())
+                                .userId(msg.getUserId())
+                                .status(status)
+                                .eventId(eventId)
+                                .rejectReason(rejectReason)
+                                .score(scoringResult != null ? scoringResult.getTotalScore() : null)
+                                .aiScore(scoringResult != null ? scoringResult.getAiScore() : null)
+                                .spatialScore(scoringResult != null ? scoringResult.getSpatialScore() : null)
+                                .reputationScore(scoringResult != null ? scoringResult.getReputationScore() : null)
+                                .build();
 
-                        kafkaTemplate.send(reportStatusTopic, msg.getReportId(), event);
-
-                        log.info("[REPORT-STATUS] Published: reportId={}, status={}, eventId={}, score={}",
-                                        msg.getReportId(), status, eventId,
-                                        scoringResult != null ? scoringResult.getTotalScore() : null);
-
-                } catch (Exception e) {
-                        log.error("[REPORT-STATUS] Publish failed (non-critical): reportId={}, status={}: {}",
-                                        msg.getReportId(), status, e.getMessage(), e);
-                }
+                reportStatusEventPublisher.publish(event);
         }
 }
