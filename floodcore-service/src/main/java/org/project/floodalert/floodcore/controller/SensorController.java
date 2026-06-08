@@ -116,6 +116,7 @@ public class SensorController {
      * @param includeLogs Có lấy kèm lịch sử logs không (mặc định: false)
      * @return Chi tiết đầy đủ của sensor
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<SensorDetailResponse>> getSensorDetail(
             @PathVariable(name = "id") UUID id,
@@ -142,6 +143,7 @@ public class SensorController {
      * @param includeLogs Có lấy kèm lịch sử logs không
      * @return Chi tiết đầy đủ của sensor
      */
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/by-sensor-id/{sensorId}")
     public ResponseEntity<ApiResponse<SensorDetailResponse>> getSensorDetailBySensorId(
             @PathVariable(name = "sensorId") String sensorId,

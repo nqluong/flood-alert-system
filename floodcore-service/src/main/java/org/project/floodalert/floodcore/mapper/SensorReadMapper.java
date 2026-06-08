@@ -51,6 +51,7 @@ public class SensorReadMapper {
                 .lat(sensor.getLat())
                 .lon(sensor.getLon())
                 .status(sensor.getStatus())
+                .apiKey(sensor.getApiKey())
                 .warningThreshold(sensor.getWarningThreshold())
                 .dangerThreshold(sensor.getDangerThreshold())
                 .hardwareModel(sensor.getHardwareModel())

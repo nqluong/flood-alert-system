@@ -22,6 +22,7 @@ public class SensorDetailResponse {
     BigDecimal lat;
     BigDecimal lon;
     String status;
+    String apiKey;
 
     // Ngưỡng cảnh báo
     BigDecimal warningThreshold;
