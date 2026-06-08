@@ -125,7 +125,7 @@ public class NotificationEventConsumer {
                 })
                 .peek(entry -> {
                     NotificationPreference pref = preferenceMap.get(entry.getKey());
-                    trimZonesOutsideRadius(entry.getValue(), pref);
+                    trimOutsideUserRadius(entry.getValue(), pref);
                 })
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
@@ -165,20 +165,29 @@ public class NotificationEventConsumer {
     }
 
     /**
-     * Loại bỏ các zone trong affectedZones có khoảng cách tới điểm ngập >
-     * alertRadiusMeters
-     * để tránh thông báo đề cập địa điểm nằm ngoài bán kính người dùng cài đặt.
+     * Quét sơ bộ dùng MAX_SCAN_RADIUS_METERS (10km) nên context có thể chứa active
+     * location/zone nằm ngoài alertRadiusMeters mà user thực sự cấu hình. Cắt bỏ các
+     * thành phần đó để title/body không claim "đang ảnh hưởng" tới khu vực vượt quá
+     * bán kính cảnh báo của user — tránh báo nhầm "cả 2" khi thực ra chỉ 1 bên nằm
+     * trong bán kính.
      */
-    private void trimZonesOutsideRadius(NotificationContext context, NotificationPreference pref) {
-        if (context.getZoneDistances() == null || context.getZoneDistances().isEmpty())
-            return;
+    private void trimOutsideUserRadius(NotificationContext context, NotificationPreference pref) {
         double radiusMeters = (pref != null && pref.getAlertRadiusMeters() != null)
                 ? pref.getAlertRadiusMeters()
                 : DEFAULT_PREFERENCE.getAlertRadiusMeters();
-        context.getAffectedZones().removeIf(zone -> {
-            Double dist = context.getZoneDistances().get(zone);
-            return dist != null && dist > radiusMeters;
-        });
+
+        if (context.isNearActive() && context.getActiveDistance() != null
+                && context.getActiveDistance() > radiusMeters) {
+            context.setNearActive(false);
+            context.setActiveDistance(null);
+        }
+
+        if (context.getZoneDistances() != null && !context.getZoneDistances().isEmpty()) {
+            context.getAffectedZones().removeIf(zone -> {
+                Double dist = context.getZoneDistances().get(zone);
+                return dist != null && dist > radiusMeters;
+            });
+        }
     }
 
     private boolean isSafeLevel(String severityLevel) {

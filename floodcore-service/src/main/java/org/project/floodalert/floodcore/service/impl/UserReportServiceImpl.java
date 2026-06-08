@@ -22,6 +22,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -53,7 +55,7 @@ public class UserReportServiceImpl implements UserReportService {
             log.info("[UserReportService] Lưu báo cáo thành công - reportId={}, userId={}", reportId, userId);
 
             UserReportEvent event = userReportMapper.toEvent(savedReport);
-            userReportEventProducer.publish(event);
+            publishAfterCommit(event);
 
             // Trả về response cho client
             return userReportMapper.toResponse(savedReport);
@@ -64,6 +66,19 @@ public class UserReportServiceImpl implements UserReportService {
         } catch (Exception e) {
             log.error("[UserReportService] Lỗi hệ thống khi xử lý báo cáo từ userId={}: {}", userId, e.getMessage(), e);
             throw new AppException(CoreErrorCode.DATABASE_ERROR, "Không thể lưu báo cáo do lỗi hệ thống");
+        }
+    }
+
+    private void publishAfterCommit(UserReportEvent event) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    userReportEventProducer.publish(event);
+                }
+            });
+        } else {
+            userReportEventProducer.publish(event);
         }
     }
 
