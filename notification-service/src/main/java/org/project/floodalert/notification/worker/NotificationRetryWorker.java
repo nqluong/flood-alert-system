@@ -174,25 +174,25 @@ public class NotificationRetryWorker {
     }
 
 
+    @Scheduled(cron = "${app.notification.cleanup.cron:0 0 3 * * *}")
     @Transactional
     public void cleanupOldDeadNotifications() {
         try {
             long startTime = System.currentTimeMillis();
             LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
 
-            log.info("[Virtual Thread] Bắt đầu cleanup DEAD notifications cũ hơn 30 ngày");
+            log.info("[Cleanup] Bắt đầu cleanup DEAD notifications cũ hơn 30 ngày");
 
-//             int deletedCount = notificationRepository.deleteByStatusAndCreatedAtBefore(
-//                 NotificationStatus.DEAD,
-//                 cutoffDate
-//             );
+            int deletedCount = notificationRepository.deleteByStatusAndCreatedAtBefore(
+                NotificationStatus.DEAD,
+                cutoffDate
+            );
 
-            // long duration = System.currentTimeMillis() - startTime;
-            // log.info("Cleanup completed: Deleted {} old DEAD notifications in {}ms",
-            //          deletedCount, duration);
+            long duration = System.currentTimeMillis() - startTime;
+            log.info("[Cleanup] Đã xóa {} DEAD notifications cũ trong {}ms", deletedCount, duration);
 
         } catch (Exception e) {
-            log.error("Lỗi khi cleanup old DEAD notifications", e);
+            log.error("[Cleanup] Lỗi khi cleanup old DEAD notifications", e);
         }
     }
 }

@@ -46,6 +46,7 @@ public class FcmDispatchService {
     private final NotificationRepository notificationRepository;
 
     private static final int FCM_BATCH_SIZE = 500;
+    private static final int RETRY_DELAY_MINUTES = 5;
 
     @Value("${app.notification.fcm.parallelism:8}")
     private int fcmParallelism;
@@ -77,8 +78,8 @@ public class FcmDispatchService {
         Map<UUID, String> userTokenMap = fetchFcmTokens(notifications);
 
         if (userTokenMap.isEmpty()) {
-            log.warn("[FCM] Không tìm thấy FCM token cho {} users", notifications.size());
-            markAllAsFailed(notifications, "No FCM tokens found");
+            log.info("[FCM] Không tìm thấy FCM token cho {} users — lưu DB để xem sau", notifications.size());
+            markAllAsDeliveredWithoutPush(notifications);
             notificationRepository.saveAll(notifications);
             return 0;
         }
@@ -127,12 +128,9 @@ public class FcmDispatchService {
                 ));
 
         List<Notification> invalid = partitioned.get(false);
-        invalid.forEach(n -> {
-            n.setStatus(NotificationStatus.FAILED);
-            n.setErrorMessage("Missing FCM token");
-        });
         if (!invalid.isEmpty()) {
-            log.debug("[FCM] {} notifications thiếu token sẽ bị đánh dấu FAILED", invalid.size());
+            markAllAsDeliveredWithoutPush(invalid);
+            log.info("[FCM] {} notifications thiếu FCM token — đánh dấu DELIVERED để xem trong hộp thư", invalid.size());
         }
 
         return partitioned.get(true);
@@ -197,6 +195,8 @@ public class FcmDispatchService {
                 FirebaseMessagingException ex = sr.getException();
                 n.setStatus(NotificationStatus.FAILED);
                 n.setErrorMessage(ex != null ? ex.getMessage() : "Unknown error");
+                n.setRetryCount(n.getRetryCount() + 1);
+                n.setNextRetryAt(now.plusMinutes(RETRY_DELAY_MINUTES));
             }
         });
     }
@@ -244,9 +244,12 @@ public class FcmDispatchService {
     }
 
     private void markBatchAsFailed(List<Notification> batch, String errorMessage) {
+        LocalDateTime retryAt = LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES);
         batch.forEach(n -> {
             n.setStatus(NotificationStatus.FAILED);
             n.setErrorMessage(errorMessage);
+            n.setRetryCount(n.getRetryCount() + 1);
+            n.setNextRetryAt(retryAt);
         });
     }
 
@@ -255,6 +258,10 @@ public class FcmDispatchService {
             n.setStatus(NotificationStatus.FAILED);
             n.setErrorMessage(errorMessage);
         });
+    }
+
+    private void markAllAsDeliveredWithoutPush(List<Notification> notifications) {
+        notifications.forEach(n -> n.setStatus(NotificationStatus.DELIVERED));
     }
 
     private <T> List<List<T>> partitionList(List<T> list, int partitionSize) {

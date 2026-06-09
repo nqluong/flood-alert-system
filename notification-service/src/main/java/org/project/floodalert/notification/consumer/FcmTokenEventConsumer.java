@@ -73,8 +73,9 @@ public class FcmTokenEventConsumer {
                     event.getUserId());
 
         } catch (Exception e) {
-            log.error("[FcmTokenEventConsumer] Lỗi khi xử lý FCM token event - userId: {}, eventType: {}", 
+            log.error("[FcmTokenEventConsumer] Lỗi khi xử lý FCM token event - userId: {}, eventType: {}",
                     event.getUserId(), event.getEventType(), e);
+            throw e;
         }
     }
 }

@@ -114,4 +114,11 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             @Param("userId") UUID userId,
             @Param("clickedAt") LocalDateTime clickedAt
     );
+
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.status = :status AND n.createdAt < :before")
+    int deleteByStatusAndCreatedAtBefore(
+            @Param("status") NotificationStatus status,
+            @Param("before") LocalDateTime before
+    );
 }

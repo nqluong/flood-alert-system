@@ -145,9 +145,16 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
                 FloodEvent newEvent = persistenceService.handleNewReport(msg, totalScore);
 
+
+                if (!STATUS_REJECTED.equals(newEvent.getStatus())) {
+                        redisGeoService.updateEventPosition(newEvent.getEventId(), newEvent.getLat(), newEvent.getLon());
+                        log.info("[REPORT-PROCESSOR][NEW-REPORT] Đã đăng ký vào Redis GEO: eventId={}, status={}",
+                                        newEvent.getEventId(), newEvent.getStatus());
+                }
+
                 // GAMIFICATION: Scenario 1 & 2
                 if (STATUS_REJECTED.equals(newEvent.getStatus())) {
-                        // AUTO_REJECTED -> Penalty -2 điểm
+                        // AUTO_REJECTED -> -2 điểm
                         log.info("[GAMIFICATION][SCENARIO-1] AUTO_REJECTED: reportId={}, userId={}, score={} → Penalty {}",
                                         msg.getReportId(), msg.getUserId(), totalScore, POINTS_AUTO_REJECTED);
 
@@ -159,7 +166,6 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         "Điểm số quá thấp (score < 0.5)", scoringResult);
 
                 } else if (STATUS_PENDING.equals(newEvent.getStatus())) {
-                        // PENDING -> Hold reward (Delayed Reward Mechanism)
                         log.info("[GAMIFICATION][SCENARIO-2] PENDING: reportId={}, userId={}, score={} → Hold reward, chờ approval",
                                         msg.getReportId(), msg.getUserId(), totalScore);
 
@@ -167,7 +173,6 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                         publishReportStatusEvent(msg, STATUS_PENDING, newEvent.getEventId(), null, scoringResult);
 
                 } else if (STATUS_ACTIVE.equals(newEvent.getStatus())) {
-                        // Event mới ngay lập tức ACTIVE (score >= 0.8) -> Reward PIONEER ngay
                         publishLifecycleEvent(newEvent, LifecycleEventType.CREATED);
 
                         log.info("[GAMIFICATION] ACTIVE ngay: reportId={}, userId={} → Reward {} (PIONEER)",
@@ -176,7 +181,6 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                         publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
                                         ReputationReason.CLUSTER_APPROVED, POINTS_PIONEER_APPROVED, msg.getReportId());
 
-                        // Bắn event cập nhật status = APPROVED về flood-core
                         publishReportStatusEvent(msg, "APPROVED", newEvent.getEventId(), null, scoringResult);
 
                         log.info("[REPORT-PROCESSOR][NEW-REPORT] Hoàn tất: eventId={}, status={}, score={}",
@@ -273,7 +277,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         .getContributorsByEventId(updatedEvent.getId());
                         log.info("[GAMIFICATION][SCENARIO-3] Found {} contributors to reward", contributors.size());
 
-                        // Reward từng contributor theo role
+                        // Reward từng contributor theo role + cập nhật status APPROVED cho TẤT CẢ reports
                         for (EventContributor contributor : contributors) {
                                 String role = contributor.getRole();
                                 int points;
@@ -292,11 +296,12 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                                 contributor.getUserId(), role, points);
 
                                 publishReputationEvent(contributor.getUserId(), updatedEvent.getEventId(),
-                                                ReputationReason.CLUSTER_APPROVED, points, msg.getReportId());
-                        }
+                                                ReputationReason.CLUSTER_APPROVED, points, contributor.getReportId());
 
-                        // Bắn event cập nhật status = APPROVED về flood-core (PENDING -> ACTIVE)
-                        publishReportStatusEvent(msg, "APPROVED", updatedEvent.getEventId(), null, scoringResult);
+                                // Bắn APPROVED cho từng report của contributor (fix: không bỏ sót report 1, 2)
+                                publishReportStatusEvent(contributor.getReportId(), contributor.getUserId(),
+                                                "APPROVED", updatedEvent.getEventId(), scoringResult);
+                        }
 
                 } else {
                         // Vẫn còn PENDING -> giữ nguyên status PENDING
@@ -370,9 +375,19 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
 
         private void publishReportStatusEvent(ReportMessage msg, String status,
                         String eventId, String rejectReason, ScoringResult scoringResult) {
+                publishReportStatusEvent(msg.getReportId(), msg.getUserId(), status, eventId, rejectReason, scoringResult);
+        }
+
+        private void publishReportStatusEvent(String reportId, UUID userId, String status,
+                        String eventId, ScoringResult scoringResult) {
+                publishReportStatusEvent(reportId, userId, status, eventId, null, scoringResult);
+        }
+
+        private void publishReportStatusEvent(String reportId, UUID userId, String status,
+                        String eventId, String rejectReason, ScoringResult scoringResult) {
                 ReportStatusUpdateEvent event = ReportStatusUpdateEvent.builder()
-                                .reportId(msg.getReportId())
-                                .userId(msg.getUserId())
+                                .reportId(reportId)
+                                .userId(userId)
                                 .status(status)
                                 .eventId(eventId)
                                 .rejectReason(rejectReason)

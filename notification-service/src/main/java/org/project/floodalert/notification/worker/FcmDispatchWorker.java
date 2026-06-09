@@ -102,37 +102,43 @@ public class FcmDispatchWorker {
                 .toList();
 
         Map<UUID, String> userTokenMap = new HashMap<>();
+        List<UUID> missingFromRedis = new ArrayList<>(uniqueUserIds);
 
         try {
             List<Object> cachedTokens = redisTemplate.opsForValue().multiGet(redisKeys);
 
             if (cachedTokens != null) {
+                missingFromRedis = new ArrayList<>();
                 for (int i = 0; i < uniqueUserIds.size(); i++) {
                     Object tokenObj = cachedTokens.get(i);
                     if (tokenObj != null && !tokenObj.toString().isBlank()) {
                         userTokenMap.put(uniqueUserIds.get(i), tokenObj.toString());
+                    } else {
+                        missingFromRedis.add(uniqueUserIds.get(i));
                     }
                 }
-                log.debug("Redis MGET thành công. Tìm thấy {}/{} tokens.", userTokenMap.size(), uniqueUserIds.size());
+                log.debug("Redis MGET thành công. Tìm thấy {}/{} tokens từ cache, {} cần fallback DB.",
+                        userTokenMap.size(), uniqueUserIds.size(), missingFromRedis.size());
             }
 
         } catch (Exception redisException) {
             log.warn("[CIRCUIT BREAKER] Lỗi kết nối Redis khi gọi MGET. Fallback xuống Database cho {} users. Chi tiết: {}",
                     uniqueUserIds.size(), redisException.getMessage());
+        }
 
+        if (!missingFromRedis.isEmpty()) {
             try {
-                List<NotificationPreference> dbPrefs = preferenceRepository.findByUserIdIn(uniqueUserIds);
-
+                List<NotificationPreference> dbPrefs = preferenceRepository.findByUserIdIn(missingFromRedis);
                 for (NotificationPreference pref : dbPrefs) {
                     String dbToken = pref.getFcmToken();
                     if (dbToken != null && !dbToken.isBlank()) {
                         userTokenMap.put(pref.getUserId(), dbToken);
                     }
                 }
-                log.debug("Fallback DB BATCH HIT - Lấy được {} tokens từ Database.", userTokenMap.size());
-
+                log.debug("Fallback DB - Lấy thêm {} tokens từ Database (tổng: {}/{}).",
+                        dbPrefs.size(), userTokenMap.size(), uniqueUserIds.size());
             } catch (Exception dbException) {
-                log.error("Lỗi thảm họa: Cả Redis và DB đều thất bại khi lấy batch tokens: {}", dbException.getMessage());
+                log.error("Lỗi thảm họa: Fallback DB thất bại khi lấy batch tokens: {}", dbException.getMessage());
             }
         }
 
@@ -184,7 +190,7 @@ public class FcmDispatchWorker {
 
         try {
             BatchResponse batchResponse = FirebaseMessaging.getInstance()
-                    .sendEachForMulticastAsync((MulticastMessage) messages)
+                    .sendEachAsync(messages)
                     .get();
 
             log.debug("Firebase sub-batch response: success={}, failure={}",
@@ -218,17 +224,15 @@ public class FcmDispatchWorker {
 
         for (Notification notification : notifications) {
             if (notification.getFcmToken() == null || notification.getFcmToken().isBlank()) {
-                notification.setStatus(NotificationStatus.FAILED);
-                notification.setErrorMessage("Missing FCM token");
-                notification.setRetryCount(notification.getRetryCount() + 1);
-                notification.setNextRetryAt(LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES));
+                // Lưu với DELIVERED để vẫn hiện trong hộp thư, không đánh dấu retry
+                notification.setStatus(NotificationStatus.DELIVERED);
                 toUpdate.add(notification);
             }
         }
 
         if (!toUpdate.isEmpty()) {
             notificationRepository.saveAll(toUpdate);
-            log.debug("Đã mark {} notifications thành FAILED do thiếu FCM token", toUpdate.size());
+            log.info("Đã lưu {} notifications với DELIVERED do thiếu FCM token (vẫn hiển thị trong hộp thư)", toUpdate.size());
         }
     }
 
