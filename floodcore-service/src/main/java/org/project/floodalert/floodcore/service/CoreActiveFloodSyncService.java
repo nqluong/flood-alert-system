@@ -89,7 +89,7 @@ public class CoreActiveFloodSyncService {
         flood.setLocationDescription(event.getLocation());
         flood.setWaterLevel(event.getWaterLevel() != null ? BigDecimal.valueOf(event.getWaterLevel()) : null);
         flood.setSeverityLevel(event.getSeverityLevel());
-        flood.setStatus("CONFIRMED");
+        flood.setStatus(event.getStatus() != null ? event.getStatus() : "CONFIRMED");
         if (event.getSource() != null) {
             flood.setSource(event.getSource());
         }

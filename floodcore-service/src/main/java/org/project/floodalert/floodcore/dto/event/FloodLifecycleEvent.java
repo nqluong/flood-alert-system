@@ -21,6 +21,7 @@ public class FloodLifecycleEvent {
     Double lat;
     Double lon;
     String source;
+    String status;
     @Builder.Default
     LocalDateTime timestamp = LocalDateTime.now();
 }

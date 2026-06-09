@@ -41,6 +41,9 @@ public class FloodLifecycleEvent {
     /** Nguồn tạo ra event: SENSOR | USER_REPORT */
     String source;
 
+    /** Trạng thái flood event: PENDING | ACTIVE | CONFIRMED | RESOLVED */
+    String status;
+
     /** Thời điểm sự kiện vòng đời này được tạo ra */
     @Builder.Default
     LocalDateTime timestamp = LocalDateTime.now();

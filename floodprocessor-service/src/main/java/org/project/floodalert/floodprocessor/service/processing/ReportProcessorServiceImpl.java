@@ -298,18 +298,16 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                 publishReputationEvent(contributor.getUserId(), updatedEvent.getEventId(),
                                                 ReputationReason.CLUSTER_APPROVED, points, contributor.getReportId());
 
-                                // Bắn APPROVED cho từng report của contributor (fix: không bỏ sót report 1, 2)
                                 publishReportStatusEvent(contributor.getReportId(), contributor.getUserId(),
                                                 "APPROVED", updatedEvent.getEventId(), scoringResult);
                         }
 
+                        publishLifecycleEvent(updatedEvent, LifecycleEventType.CREATED);
+
                 } else {
-                        // Vẫn còn PENDING -> giữ nguyên status PENDING
+                        // Vẫn còn PENDING -> giữ nguyên status PENDING, KHÔNG push lifecycle
                         publishReportStatusEvent(msg, STATUS_PENDING, updatedEvent.getEventId(), null, scoringResult);
                 }
-
-                // Bắn Kafka UPDATED event
-                publishLifecycleEvent(updatedEvent, LifecycleEventType.UPDATED);
 
                 log.info("[REPORT-PROCESSOR][PENDING-UPDATE] Completed: eventId={}, status={}, newScore={}",
                                 updatedEvent.getEventId(), updatedEvent.getStatus(), newScore);
@@ -324,6 +322,8 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                 .location(event.getLocationDescription())
                                 .severityLevel(event.getSeverityLevel())
                                 .waterLevel(event.getWaterLevel() != null ? event.getWaterLevel().doubleValue() : null)
+                                .status(event.getStatus())
+                                .source(event.getSource())
                                 .build();
 
                 kafkaTemplate.send(lifecycleTopic, event.getEventId(), lifecycleEvent);

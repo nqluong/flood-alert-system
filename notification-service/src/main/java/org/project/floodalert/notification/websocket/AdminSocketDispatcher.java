@@ -120,9 +120,13 @@ public class AdminSocketDispatcher {
         }
 
         return switch (eventType.toUpperCase()) {
-            case "CREATED" ->
-                String.format("Phát hiện ngập mới tại %s - Mức độ: %s",
-                    location, translateSeverity(event.getSeverityLevel()));
+            case "CREATED" -> {
+                String sourceLabel = "USER_REPORT".equalsIgnoreCase(event.getSource())
+                        ? "Cộng đồng xác nhận ngập tại"
+                        : "Cảm biến phát hiện ngập tại";
+                yield String.format("%s %s - Mức độ: %s",
+                        sourceLabel, location, translateSeverity(event.getSeverityLevel()));
+            }
 
             case "ESCALATED" ->
                 String.format("Mức độ ngập gia tăng tại %s - Hiện tại: %s",
