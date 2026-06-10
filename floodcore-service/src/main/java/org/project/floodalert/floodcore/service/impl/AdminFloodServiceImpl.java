@@ -36,6 +36,7 @@ public class AdminFloodServiceImpl implements AdminFloodService {
     }
 
     @Override
+    @Transactional
     public void approveReport(UUID userReportId) {
         UserReport report = userReportRepository.findById(userReportId)
                 .orElseThrow(() -> new AppException(CoreErrorCode.USER_REPORT_NOT_FOUND,
@@ -49,15 +50,16 @@ public class AdminFloodServiceImpl implements AdminFloodService {
         String floodEventId = report.getFloodEventId();
         log.info("[ADMIN-FLOOD-SERVICE] Approve report: userReportId={}, floodEventId={}", userReportId, floodEventId);
 
-        floodProcessorClient.approveFloodEvent(floodEventId);
-
         report.setStatus("APPROVED");
         report.setReviewedAt(LocalDateTime.now());
         userReportRepository.save(report);
         log.info("[ADMIN-FLOOD-SERVICE] Đã cập nhật UserReport status=APPROVED: userReportId={}", userReportId);
+
+        floodProcessorClient.approveFloodEvent(floodEventId);
     }
 
     @Override
+    @Transactional
     public void rejectReport(UUID userReportId) {
         UserReport report = userReportRepository.findById(userReportId)
                 .orElseThrow(() -> new AppException(CoreErrorCode.USER_REPORT_NOT_FOUND,
@@ -66,17 +68,16 @@ public class AdminFloodServiceImpl implements AdminFloodService {
         report.setStatus("REJECTED");
         report.setRejectReason("Bị từ chối bởi admin");
         report.setReviewedAt(LocalDateTime.now());
+        userReportRepository.save(report);
 
         if (report.getFloodEventId() == null) {
             log.info("[ADMIN-FLOOD-SERVICE] Reject report (no floodEventId): userReportId={}", userReportId);
-            userReportRepository.save(report);
             return;
         }
 
         String floodEventId = report.getFloodEventId();
         log.info("[ADMIN-FLOOD-SERVICE] Reject report: userReportId={}, floodEventId={}", userReportId, floodEventId);
         floodProcessorClient.rejectFloodEvent(floodEventId);
-        userReportRepository.save(report);
         log.info("[ADMIN-FLOOD-SERVICE] Đã cập nhật UserReport status=REJECTED: userReportId={}", userReportId);
     }
 

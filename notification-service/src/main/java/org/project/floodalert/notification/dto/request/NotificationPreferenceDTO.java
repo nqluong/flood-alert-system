@@ -1,5 +1,6 @@
 package org.project.floodalert.notification.dto.request;
 
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -29,7 +30,8 @@ public class NotificationPreferenceDTO {
     LocalTime quietHoursEnd;
 
     @NotNull(message = "Alert radius is required")
-    @Min(value = 100, message = "Alert radius must be at least 100 meters")
+    @Min(value = 0, message = "Alert radius must be at least 0 meters")
+    @Max(value = 5000, message = "Alert radius must not exceed 5000 meters")
     Integer alertRadiusMeters;
 
     @NotNull(message = "Prefer push status is required")

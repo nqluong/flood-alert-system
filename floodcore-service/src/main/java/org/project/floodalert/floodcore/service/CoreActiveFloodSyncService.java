@@ -77,7 +77,8 @@ public class CoreActiveFloodSyncService {
     }
 
     private void handleUpsert(FloodLifecycleEvent event) {
-        // UPSERT vào PostgreSQL
+        // UPSERT vào PostgreSQL: tự tạo record nếu chưa tồn tại, bất kể event type,
+        // để Redis cache (geo + detail) luôn được đồng bộ qua cacheActiveFlood() bên dưới.
         CoreActiveFlood flood = coreActiveFloodRepository
                 .findById(event.getEventId())
                 .orElseGet(() -> CoreActiveFlood.builder()

@@ -128,6 +128,21 @@ class CoreActiveFloodSyncServiceTest {
     }
 
     @Test
+    void onFloodLifecycleEvent_updated_recordNotFound_createsAndCaches() {
+        event.setType(LifecycleEventType.UPDATED);
+
+        when(coreActiveFloodRepository.findById("flood-001"))
+                .thenReturn(Optional.empty());
+
+        service.onFloodLifecycleEvent(event, acknowledgment);
+
+        verify(coreActiveFloodRepository).findById("flood-001");
+        verify(coreActiveFloodRepository).save(any(CoreActiveFlood.class));
+        verify(floodGeoCache).cacheActiveFlood(event);
+        verify(acknowledgment).acknowledge();
+    }
+
+    @Test
     void onFloodLifecycleEvent_upsert_withNullValues_stillSavesAndCaches() {
         event.setType(LifecycleEventType.CREATED);
         event.setLat(null);

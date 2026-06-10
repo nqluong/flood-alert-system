@@ -35,7 +35,7 @@ public class NotificationEventConsumer {
     private final NotificationPreferenceRepository preferenceRepository;
     private final FcmDispatchService fcmDispatchService;
 
-    private static final double MAX_SCAN_RADIUS_METERS = 10_000.0;
+    private static final double MAX_SCAN_RADIUS_METERS = 5_000.0;
     private static final int MAX_RETRIES = 3;
 
     private static final String TYPE_RESOLVED = "RESOLVED";
