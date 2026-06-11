@@ -83,8 +83,9 @@ class NotificationEventConsumerTest {
         Map<UUID, NotificationContext> ctx = new LinkedHashMap<>();
         for (UUID id : userIds) ctx.put(id, contextFor(id));
         when(aggregationService.aggregateNotificationContexts(any(), anyBoolean())).thenReturn(ctx);
-        when(aggregationService.generateNotificationTitle(any())).thenReturn("Ngập lụt gần vị trí của bạn");
-        when(aggregationService.generateNotificationBody(any(), any())).thenReturn("Có điểm ngập cách 300m (mức độ: Nguy hiểm)");
+        // lenient: các test blocked-path không bao giờ build notification nên không dùng stub này
+        lenient().when(aggregationService.generateNotificationTitle(any())).thenReturn("Có điểm ngập lụt tại Test Location khoảng 25cm");
+        lenient().when(aggregationService.generateNotificationBody(any())).thenReturn("Tại Test Location đang có ngập lụt, mực nước khoảng 25cm (mức độ: Nguy hiểm). Hãy chú ý an toàn khi di chuyển!");
     }
 
     // ── Tests ─────────────────────────────────────────────────────────────────
@@ -389,7 +390,7 @@ class NotificationEventConsumerTest {
             testEvent.setType("RESOLVED");
             stubAggregation(USER_ID);
             when(aggregationService.generateResolvedTitle()).thenReturn("Khu vực đã hết ngập");
-            when(aggregationService.generateResolvedBody(any(), any())).thenReturn("Bạn có thể di chuyển bình thường.");
+            when(aggregationService.generateResolvedBody(any())).thenReturn("Bạn có thể di chuyển bình thường.");
             when(preferenceRepository.findAllById(any()))
                     .thenReturn(List.of(prefWith(USER_ID, true, true, true)));
             when(fcmDispatchService.sendBatch(any())).thenReturn(1);

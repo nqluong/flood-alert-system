@@ -115,10 +115,23 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
             @Param("clickedAt") LocalDateTime clickedAt
     );
 
+    /**
+     * Xóa các notification đã đọc (status = CLICKED) quá hạn lưu trữ, dựa trên thời điểm đọc (clickedAt).
+     */
     @Modifying
-    @Query("DELETE FROM Notification n WHERE n.status = :status AND n.createdAt < :before")
-    int deleteByStatusAndCreatedAtBefore(
+    @Query("DELETE FROM Notification n WHERE n.status = :status AND n.clickedAt < :before")
+    int deleteByStatusAndClickedAtBefore(
             @Param("status") NotificationStatus status,
+            @Param("before") LocalDateTime before
+    );
+
+    /**
+     * Xóa các notification gửi lỗi (FAILED/DEAD) quá hạn lưu trữ, dựa trên thời điểm tạo (createdAt).
+     */
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.status IN :statuses AND n.createdAt < :before")
+    int deleteByStatusInAndCreatedAtBefore(
+            @Param("statuses") List<NotificationStatus> statuses,
             @Param("before") LocalDateTime before
     );
 }

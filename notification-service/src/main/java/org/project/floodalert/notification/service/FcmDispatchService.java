@@ -44,6 +44,7 @@ public class FcmDispatchService {
 
     private final NotificationPreferenceRepository preferenceRepository;
     private final NotificationRepository notificationRepository;
+    private final FcmFailureHandler fcmFailureHandler;
 
     private static final int FCM_BATCH_SIZE = 500;
     private static final int RETRY_DELAY_MINUTES = 5;
@@ -192,11 +193,7 @@ public class FcmDispatchService {
                 n.setFcmMessageId(sr.getMessageId());
                 n.setSentAt(now);
             } else {
-                FirebaseMessagingException ex = sr.getException();
-                n.setStatus(NotificationStatus.FAILED);
-                n.setErrorMessage(ex != null ? ex.getMessage() : "Unknown error");
-                n.setRetryCount(n.getRetryCount() + 1);
-                n.setNextRetryAt(now.plusMinutes(RETRY_DELAY_MINUTES));
+                fcmFailureHandler.handleFailure(n, sr.getException());
             }
         });
     }

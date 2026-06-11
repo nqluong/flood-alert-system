@@ -18,6 +18,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
@@ -64,11 +65,15 @@ public class OrsRouteClient {
 
         } catch (HttpClientErrorException.BadRequest e) {
             log.error("[SafeRouting] ORS API bad request (400): {}", e.getResponseBodyAsString());
-            throw new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR);
+            throw mapOrsErrorResponse(e.getResponseBodyAsString());
 
         } catch (ResourceAccessException e) {
             log.error("[SafeRouting] ORS API timeout: {}", e.getMessage());
             throw new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR);
+
+        } catch (HttpServerErrorException e) {
+            log.error("[SafeRouting] ORS API lỗi server ({}): {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw mapOrsErrorResponse(e.getResponseBodyAsString());
 
         } catch (AppException e) {
             throw e;
@@ -128,6 +133,28 @@ public class OrsRouteClient {
                     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(orsRequest));
         } catch (Exception e) {
             log.warn("[SafeRouting] Không thể serialize ORS payload: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Map mã lỗi routing (field error.code) trong response của ORS sang AppException
+     * tương ứng, để mobile hiển thị được lý do cụ thể thay vì lỗi chung chung.
+     */
+    private AppException mapOrsErrorResponse(String responseBody) {
+        return switch (extractOrsErrorCode(responseBody)) {
+            case 2009, 2099 -> new AppException(CoreErrorCode.ROUTE_NOT_FOUND);
+            case 2010 -> new AppException(CoreErrorCode.ROUTE_POINT_NOT_FOUND);
+            case 2013, 2014, 2015, 2016 -> new AppException(CoreErrorCode.ROUTE_POINT_NOT_ACCESSIBLE);
+            default -> new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR);
+        };
+    }
+
+    private int extractOrsErrorCode(String responseBody) {
+        try {
+            return objectMapper.readTree(responseBody).path("error").path("code").asInt(-1);
+        } catch (Exception e) {
+            log.warn("[SafeRouting] Không thể parse mã lỗi ORS: {}", e.getMessage());
+            return -1;
         }
     }
 }

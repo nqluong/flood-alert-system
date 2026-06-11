@@ -9,6 +9,7 @@ import org.project.floodalert.notification.model.Notification;
 import org.project.floodalert.notification.model.NotificationPreference;
 import org.project.floodalert.notification.repository.NotificationPreferenceRepository;
 import org.project.floodalert.notification.repository.NotificationRepository;
+import org.project.floodalert.notification.service.FcmFailureHandler;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -29,6 +30,7 @@ public class FcmDispatchWorker {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceRepository preferenceRepository;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final FcmFailureHandler fcmFailureHandler;
     private final Executor virtualThreadExecutor;
 
     private static final String REDIS_FCM_TOKEN_PREFIX = "user:fcm_token:";
@@ -40,11 +42,13 @@ public class FcmDispatchWorker {
             NotificationRepository notificationRepository,
             NotificationPreferenceRepository preferenceRepository,
             RedisTemplate<String, Object> redisTemplate,
+            FcmFailureHandler fcmFailureHandler,
             @Qualifier("virtualThreadExecutor") Executor virtualThreadExecutor) {
 
         this.notificationRepository = notificationRepository;
         this.preferenceRepository = preferenceRepository;
         this.redisTemplate = redisTemplate;
+        this.fcmFailureHandler = fcmFailureHandler;
         this.virtualThreadExecutor = virtualThreadExecutor;
     }
 
@@ -314,17 +318,7 @@ public class FcmDispatchWorker {
 
             } else {
                 // Thất bại
-                FirebaseMessagingException exception = response.getException();
-                String errorCode = exception != null ? exception.getErrorCode().toString() : "UNKNOWN";
-                String errorMessage = exception != null ? exception.getMessage() : "Unknown error";
-
-                notification.setStatus(NotificationStatus.FAILED);
-                notification.setRetryCount(notification.getRetryCount() + 1);
-                notification.setErrorMessage(String.format("[%s] %s", errorCode, errorMessage));
-                notification.setNextRetryAt(LocalDateTime.now().plusMinutes(RETRY_DELAY_MINUTES));
-
-                log.warn("Gửi thất bại notification {} cho user {}: {}",
-                        notification.getId(), notification.getUserId(), errorMessage);
+                fcmFailureHandler.handleFailure(notification, response.getException());
             }
 
             toUpdate.add(notification);

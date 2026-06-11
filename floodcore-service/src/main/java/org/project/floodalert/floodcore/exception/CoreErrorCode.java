@@ -22,6 +22,10 @@ public enum CoreErrorCode implements BaseErrorCode {
     USER_REPORT_ALREADY_REVIEWED(4011, "Báo cáo đã được xét duyệt trước đó", HttpStatus.CONFLICT),
     REPORT_NOT_LINKED_TO_EVENT(4013, "Báo cáo chưa được hệ thống xử lý, vui lòng thử lại sau", HttpStatus.CONFLICT),
 
+    ROUTE_NOT_FOUND(4014, "Không tìm thấy đường đi giữa 2 điểm, vùng ngập có thể đã chặn hết lối đi duy nhất", HttpStatus.NOT_FOUND),
+    ROUTE_POINT_NOT_FOUND(4015, "Tọa độ điểm xuất phát hoặc điểm đến nằm ngoài vùng dữ liệu bản đồ", HttpStatus.BAD_REQUEST),
+    ROUTE_POINT_NOT_ACCESSIBLE(4016, "Điểm xuất phát hoặc điểm đến nằm trong khu vực không thể tiếp cận bằng đường bộ", HttpStatus.BAD_REQUEST),
+
     FIREBASE_STORAGE_ERROR(5003, "Lỗi khi tạo URL upload", HttpStatus.INTERNAL_SERVER_ERROR),
     INVALID_FILE_EXTENSION(4012, "Định dạng file không hợp lệ", HttpStatus.BAD_REQUEST),
 

@@ -34,6 +34,12 @@ public class NotificationRetryWorker {
     @Value("${app.notification.retry.max-retries:3}")
     private int maxRetries;
 
+    @Value("${app.notification.cleanup.read-retention-days:30}")
+    private int readRetentionDays;
+
+    @Value("${app.notification.cleanup.failed-retention-days:15}")
+    private int failedRetentionDays;
+
     @Scheduled(cron = "${app.notification.retry.cron:0 * * * * *}")
     @Transactional
     public void processFailedNotifications() {
@@ -174,25 +180,34 @@ public class NotificationRetryWorker {
     }
 
 
+    /**
+     * Dọn dẹp định kỳ: xóa notification đã đọc (CLICKED) quá {@code readRetentionDays} ngày
+     * (tính theo thời điểm đọc) và notification gửi lỗi (FAILED/DEAD) quá {@code failedRetentionDays}
+     * ngày (tính theo thời điểm tạo).
+     */
     @Scheduled(cron = "${app.notification.cleanup.cron:0 0 3 * * *}")
     @Transactional
-    public void cleanupOldDeadNotifications() {
+    public void cleanupOldNotifications() {
         try {
             long startTime = System.currentTimeMillis();
-            LocalDateTime cutoffDate = LocalDateTime.now().minusDays(30);
+            LocalDateTime now = LocalDateTime.now();
 
-            log.info("[Cleanup] Bắt đầu cleanup DEAD notifications cũ hơn 30 ngày");
+            int deletedRead = notificationRepository.deleteByStatusAndClickedAtBefore(
+                    NotificationStatus.CLICKED,
+                    now.minusDays(readRetentionDays)
+            );
 
-            int deletedCount = notificationRepository.deleteByStatusAndCreatedAtBefore(
-                NotificationStatus.DEAD,
-                cutoffDate
+            int deletedFailed = notificationRepository.deleteByStatusInAndCreatedAtBefore(
+                    List.of(NotificationStatus.FAILED, NotificationStatus.DEAD),
+                    now.minusDays(failedRetentionDays)
             );
 
             long duration = System.currentTimeMillis() - startTime;
-            log.info("[Cleanup] Đã xóa {} DEAD notifications cũ trong {}ms", deletedCount, duration);
+            log.info("[Cleanup] Đã xóa {} notification đã đọc (>{} ngày) và {} notification gửi lỗi (>{} ngày) trong {}ms",
+                    deletedRead, readRetentionDays, deletedFailed, failedRetentionDays, duration);
 
         } catch (Exception e) {
-            log.error("[Cleanup] Lỗi khi cleanup old DEAD notifications", e);
+            log.error("[Cleanup] Lỗi khi cleanup old notifications", e);
         }
     }
 }

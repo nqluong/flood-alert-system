@@ -80,6 +80,11 @@ app:
       max-retries: 3
       retry-delay-minutes: 5
       cron: "0 * * * * *"
+
+    cleanup:
+      cron: "0 0 3 * * *"
+      read-retention-days: 30
+      failed-retention-days: 15
 logging:
   level:
     org.apache.kafka: WARN

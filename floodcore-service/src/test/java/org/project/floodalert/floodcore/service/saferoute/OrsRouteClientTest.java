@@ -13,17 +13,20 @@ import org.project.floodalert.common.exception.AppException;
 import org.project.floodalert.floodcore.config.OrsProperties;
 import org.project.floodalert.floodcore.dto.request.SafeRouteRequest;
 import org.project.floodalert.floodcore.enums.VehicleType;
+import org.project.floodalert.floodcore.exception.CoreErrorCode;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -57,6 +60,10 @@ class OrsRouteClientTest {
         return List.of(List.of(
                 List.of(106.5, 10.5), List.of(106.6, 10.5),
                 List.of(106.6, 10.6), List.of(106.5, 10.5)));
+    }
+
+    private void stubOrsErrorBody(String body) throws Exception {
+        when(objectMapper.readTree(body)).thenReturn(new ObjectMapper().readTree(body));
     }
 
     // --- call success + buildOptions branches ---
@@ -125,7 +132,76 @@ class OrsRouteClientTest {
         doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
                 HttpHeaders.EMPTY, new byte[0], StandardCharsets.UTF_8))
                 .when(restTemplate).exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class));
-        assertThrows(AppException.class, () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        AppException ex = assertThrows(AppException.class,
+                () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        assertEquals(CoreErrorCode.EXTERNAL_SERVICE_ERROR, ex.getErrorCode());
+    }
+
+    // --- ORS routing error code mapping (error.code trong response body) ---
+
+    @Test
+    void call_badRequest_routeNotFound_mapsToRouteNotFound() throws Exception {
+        String body = "{\"error\":{\"code\":2009,\"message\":\"Route could not be found\"}}";
+        stubOrsErrorBody(body);
+        doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
+                HttpHeaders.EMPTY, body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8))
+                .when(restTemplate).exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        assertEquals(CoreErrorCode.ROUTE_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void call_badRequest_pointNotFound_mapsToRoutePointNotFound() throws Exception {
+        String body = "{\"error\":{\"code\":2010,\"message\":\"Point was not found\"}}";
+        stubOrsErrorBody(body);
+        doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
+                HttpHeaders.EMPTY, body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8))
+                .when(restTemplate).exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        assertEquals(CoreErrorCode.ROUTE_POINT_NOT_FOUND, ex.getErrorCode());
+    }
+
+    @Test
+    void call_badRequest_entryExitNotReached_mapsToRoutePointNotAccessible() throws Exception {
+        String body = "{\"error\":{\"code\":2016,\"message\":\"No route between entry and exit found\"}}";
+        stubOrsErrorBody(body);
+        doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
+                HttpHeaders.EMPTY, body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8))
+                .when(restTemplate).exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        assertEquals(CoreErrorCode.ROUTE_POINT_NOT_ACCESSIBLE, ex.getErrorCode());
+    }
+
+    @Test
+    void call_badRequest_unmappedOrsCode_fallsBackToExternalServiceError() throws Exception {
+        String body = "{\"error\":{\"code\":2012,\"message\":\"Unknown parameter\"}}";
+        stubOrsErrorBody(body);
+        doThrow(HttpClientErrorException.create(HttpStatus.BAD_REQUEST, "Bad Request",
+                HttpHeaders.EMPTY, body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8))
+                .when(restTemplate).exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        assertEquals(CoreErrorCode.EXTERNAL_SERVICE_ERROR, ex.getErrorCode());
+    }
+
+    @Test
+    void call_serverError_unknownInternalError_mapsToRouteNotFound() throws Exception {
+        String body = "{\"error\":{\"code\":2099,\"message\":\"Unknown internal error\"}}";
+        stubOrsErrorBody(body);
+        doThrow(HttpServerErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                HttpHeaders.EMPTY, body.getBytes(StandardCharsets.UTF_8), StandardCharsets.UTF_8))
+                .when(restTemplate).exchange(anyString(), eq(HttpMethod.POST), any(), eq(String.class));
+
+        AppException ex = assertThrows(AppException.class,
+                () -> orsRouteClient.call(buildRequest(VehicleType.CAR), null));
+        assertEquals(CoreErrorCode.ROUTE_NOT_FOUND, ex.getErrorCode());
     }
 
     @Test

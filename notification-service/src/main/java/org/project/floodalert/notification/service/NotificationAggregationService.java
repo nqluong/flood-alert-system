@@ -61,19 +61,19 @@ public class NotificationAggregationService {
         return merged;
     }
 
-    public String generateNotificationTitle(NotificationContext context) {
-        return messageBuilder.title(context);
+    public String generateNotificationTitle(FloodEventDTO event) {
+        return messageBuilder.title(event);
     }
 
-    public String generateNotificationBody(NotificationContext context, FloodEventDTO event) {
-        return messageBuilder.body(context, event);
+    public String generateNotificationBody(FloodEventDTO event) {
+        return messageBuilder.body(event);
     }
 
     public String generateResolvedTitle() {
         return messageBuilder.resolvedTitle();
     }
 
-    public String generateResolvedBody(NotificationContext context, FloodEventDTO event) {
-        return messageBuilder.resolvedBody(context, event);
+    public String generateResolvedBody(FloodEventDTO event) {
+        return messageBuilder.resolvedBody(event);
     }
 }

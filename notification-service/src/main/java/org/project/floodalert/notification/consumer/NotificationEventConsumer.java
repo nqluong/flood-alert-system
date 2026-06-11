@@ -234,10 +234,10 @@ public class NotificationEventConsumer {
     private Notification buildNotification(NotificationContext context, FloodEventDTO event, boolean isResolved) {
         String title = isResolved
                 ? aggregationService.generateResolvedTitle()
-                : aggregationService.generateNotificationTitle(context);
+                : aggregationService.generateNotificationTitle(event);
         String body = isResolved
-                ? aggregationService.generateResolvedBody(context, event)
-                : aggregationService.generateNotificationBody(context, event);
+                ? aggregationService.generateResolvedBody(event)
+                : aggregationService.generateNotificationBody(event);
 
         return Notification.builder()
                 .userId(context.getUserId())
