@@ -237,6 +237,11 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
             activeEvent.setWaterLevel(newWaterLevel);
         }
 
+        // Backfill location cho event được tạo trước khi sensor có thông tin vị trí
+        if (isBlank(activeEvent.getLocationDescription()) && !isBlank(data.getLocationName())) {
+            activeEvent.setLocationDescription(data.getLocationName());
+        }
+
         // Cập nhật mức độ cảnh báo theo trạng thái mới
         activeEvent.setSeverityLevel(newStatus.name());
 
@@ -340,6 +345,10 @@ public class FloodEventDbServiceImpl implements FloodEventDbService {
 
     private BigDecimal toBigDecimal(Double value) {
         return value != null ? BigDecimal.valueOf(value) : null;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private record BackLinkTask(String readingId, FloodEvent floodEvent) {}

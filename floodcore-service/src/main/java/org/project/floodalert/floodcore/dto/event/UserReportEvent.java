@@ -23,6 +23,9 @@ public class UserReportEvent {
 
     String description;
 
+    /** Địa chỉ điểm ngập (client reverse-geocode từ tọa độ GPS) */
+    String address;
+
     @Builder.Default
     LocalDateTime reportedAt = LocalDateTime.now();
 }

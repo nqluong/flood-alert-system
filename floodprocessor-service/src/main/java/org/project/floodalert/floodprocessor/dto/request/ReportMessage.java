@@ -30,6 +30,9 @@ public class ReportMessage {
 
     String description;
 
+    /** Địa chỉ điểm ngập (reverse-geocode từ vị trí người báo cáo) */
+    String address;
+
     @Builder.Default
     Instant receivedAt = Instant.now();
 }

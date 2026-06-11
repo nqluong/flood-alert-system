@@ -15,4 +15,6 @@ public class UserReportRequest {
     Double lat;
     Double lon;
     FloodLevel level;
+    /** Địa chỉ điểm ngập (client reverse-geocode từ tọa độ GPS) */
+    String address;
 }

@@ -140,6 +140,7 @@ public class SensorDataBatchProcessor {
                 Double dangerLevel = parseDoubleFromRedis(redisData.get("danger_threshold"));
                 String streetName = redisData.get("location_name");
                 String district = redisData.get("district");
+                String sensorName = redisData.get("name");
 
                 // Validate required thresholds
                 if (warningLevel == null || dangerLevel == null) {
@@ -148,7 +149,7 @@ public class SensorDataBatchProcessor {
                     continue;
                 }
 
-                String locationName = buildLocationName(streetName, district);
+                String locationName = buildLocationName(streetName, district, sensorName);
 
                 // Build EnrichedSensorData
                 EnrichedSensorData enriched = EnrichedSensorData.builder()
@@ -194,14 +195,28 @@ public class SensorDataBatchProcessor {
         }
     }
 
-    private String buildLocationName(String streetName, String district) {
-        if (streetName != null && district != null) {
+    /**
+     * Floodcore ghi metadata vào Redis với default là chuỗi rỗng "" khi sensor
+     * thiếu thông tin, nên phải coi blank là thiếu — nếu không location của
+     * FloodEvent (và notification) sẽ thành chuỗi rỗng. Khi không có địa chỉ,
+     * fallback sang tên sensor (vị trí lắp đặt); trả về null nếu không có gì
+     * để downstream tự fallback sang tọa độ.
+     */
+    private String buildLocationName(String streetName, String district, String sensorName) {
+        boolean hasStreet = isNotBlank(streetName);
+        boolean hasDistrict = isNotBlank(district);
+
+        if (hasStreet && hasDistrict) {
             return streetName + ", " + district;
-        } else if (streetName != null) {
+        } else if (hasStreet) {
             return streetName;
-        } else if (district != null) {
+        } else if (hasDistrict) {
             return district;
         }
-        return "Unknown Location";
+        return isNotBlank(sensorName) ? sensorName : null;
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
     }
 }

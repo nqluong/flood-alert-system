@@ -104,6 +104,12 @@ public class FloodEventPersistenceService {
             int newVoteCount = oldVoteCount + 1;
             existingEvent.setVoteCount(newVoteCount);
 
+            // Backfill địa chỉ cho event được tạo trước khi báo cáo có địa chỉ
+            if ((existingEvent.getLocationDescription() == null || existingEvent.getLocationDescription().isBlank())
+                    && msg.getAddress() != null && !msg.getAddress().isBlank()) {
+                existingEvent.setLocationDescription(msg.getAddress());
+            }
+
             log.info("[PERSISTENCE][CENTROID] PENDING event centroid updated: eventId={}, ({},{}) → ({},{})",
                     existingEventId,
                     String.format("%.6f", oldLat), String.format("%.6f", oldLon),
@@ -188,6 +194,7 @@ public class FloodEventPersistenceService {
                 .source(FLOOD_EVENT_SOURCE_USER_REPORT)
                 .lat(msg.getLat())
                 .lon(msg.getLon())
+                .locationDescription(msg.getAddress())
                 .severityLevel(msg.getSeverityLevel())
                 .status(status)
                 .confidenceScore(BigDecimal.valueOf(totalScore).setScale(2, RoundingMode.HALF_UP))

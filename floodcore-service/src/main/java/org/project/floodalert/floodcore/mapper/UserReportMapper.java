@@ -67,7 +67,7 @@ public class UserReportMapper {
                 .build();
     }
 
-    public UserReportEvent toEvent(UserReport report) {
+    public UserReportEvent toEvent(UserReport report, String address) {
         return UserReportEvent.builder()
                 .reportId(report.getReportId())
                 .userId(report.getUserId())
@@ -76,6 +76,7 @@ public class UserReportMapper {
                 .lat(report.getLat() != null ? report.getLat().doubleValue() : null)
                 .lon(report.getLon() != null ? report.getLon().doubleValue() : null)
                 .description(report.getDescription())
+                .address(address)
                 .reportedAt(report.getCreatedAt())
                 .build();
     }

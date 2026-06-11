@@ -54,7 +54,7 @@ public class UserReportServiceImpl implements UserReportService {
             UserReport savedReport = userReportRepository.save(report);
             log.info("[UserReportService] Lưu báo cáo thành công - reportId={}, userId={}", reportId, userId);
 
-            UserReportEvent event = userReportMapper.toEvent(savedReport);
+            UserReportEvent event = userReportMapper.toEvent(savedReport, request.getAddress());
             publishAfterCommit(event);
 
             // Trả về response cho client

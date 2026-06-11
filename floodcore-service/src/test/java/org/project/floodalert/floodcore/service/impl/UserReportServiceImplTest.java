@@ -55,7 +55,7 @@ class UserReportServiceImplTest {
         UserReport report = UserReport.builder().build();
         when(userReportMapper.toEntity(any(), any(), anyString())).thenReturn(report);
         when(userReportRepository.save(any())).thenReturn(report);
-        when(userReportMapper.toEvent(any())).thenReturn(new UserReportEvent());
+        when(userReportMapper.toEvent(any(), any())).thenReturn(new UserReportEvent());
         when(userReportMapper.toResponse(any())).thenReturn(new UserReportResponse());
         userReportService.submitUserReport(buildRequest(10.5, 106.5), UUID.randomUUID());
     }
