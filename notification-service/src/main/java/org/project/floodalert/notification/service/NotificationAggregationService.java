@@ -50,12 +50,27 @@ public class NotificationAggregationService {
         }
     }
 
+    /**
+     * Gộp kết quả active + static theo userId: mỗi user chỉ còn đúng 1 context
+     * (→ 1 notification) cho mỗi điểm ngập. zoneDistances phải được merge đầy đủ
+     * để bước trimOutsideUserRadius phía consumer còn dữ liệu cắt zone ngoài bán kính.
+     */
     private Map<UUID, NotificationContext> mergeContexts(Map<UUID, NotificationContext> active,
                                                          Map<UUID, NotificationContext> staticMap) {
         Map<UUID, NotificationContext> merged = new HashMap<>(active);
         staticMap.forEach((userId, staticCtx) -> merged.merge(userId, staticCtx, (existing, incoming) -> {
-            existing.getAffectedZones().addAll(incoming.getAffectedZones());
-            existing.setStaticDistance(incoming.getStaticDistance());
+            incoming.getAffectedZones().stream()
+                    .filter(zone -> !existing.getAffectedZones().contains(zone))
+                    .forEach(existing.getAffectedZones()::add);
+
+            incoming.getZoneDistances().forEach((zone, distance) ->
+                    existing.getZoneDistances().merge(zone, distance, Math::min));
+
+            Double incomingDistance = incoming.getStaticDistance();
+            if (incomingDistance != null
+                    && (existing.getStaticDistance() == null || incomingDistance < existing.getStaticDistance())) {
+                existing.setStaticDistance(incomingDistance);
+            }
             return existing;
         }));
         return merged;
