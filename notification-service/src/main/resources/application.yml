@@ -57,6 +57,7 @@ app:
       processed-events: flood-sensor-data-processed
       lifecycle-events: flood-lifecycle-events
       fcm-token: ${KAFKA_FCM_TOKEN_TOPIC:fcm-token-events}
+      reputation: ${KAFKA_REPUTATION_TOPIC:reputation-update-events}
     consumer:
       telemetry:
         group-id: admin-socket-telemetry-group
@@ -66,6 +67,8 @@ app:
         group-id: ${KAFKA_FCM_TOKEN_GROUP_ID:notification-fcm-token-group}
       user-location:
         group-id: ${KAFKA_USER_LOCATION_GROUP_ID:notification-user-location-group}
+      reputation:
+        group-id: ${KAFKA_REPUTATION_GROUP_ID:notification-reputation-group}
 
   firebase:
     enabled: true
