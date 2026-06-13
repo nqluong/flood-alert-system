@@ -42,7 +42,7 @@ public class SafeRoutingServiceImpl implements SafeRoutingService {
         }
 
         log.info("[SafeRouting] Có {} điểm ngập nguy hiểm cần tránh", dangerousFloods.size());
-        List<List<List<Double>>> avoidPolygons = AvoidPolygonBuilder.build(dangerousFloods);
+        List<List<List<List<Double>>>> avoidPolygons = AvoidPolygonBuilder.build(dangerousFloods);
         String geoJson = orsRouteClient.call(request, avoidPolygons);
 
         return buildSafeResponse(geoJson, dangerousFloods.size(),

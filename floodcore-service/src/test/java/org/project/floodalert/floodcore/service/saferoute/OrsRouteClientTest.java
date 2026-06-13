@@ -56,10 +56,10 @@ class OrsRouteClientTest {
                 .build();
     }
 
-    private List<List<List<Double>>> buildAvoidPolygons() {
-        return List.of(List.of(
+    private List<List<List<List<Double>>>> buildAvoidPolygons() {
+        return List.of(List.of(List.of(
                 List.of(106.5, 10.5), List.of(106.6, 10.5),
-                List.of(106.6, 10.6), List.of(106.5, 10.5)));
+                List.of(106.6, 10.6), List.of(106.5, 10.5))));
     }
 
     private void stubOrsErrorBody(String body) throws Exception {

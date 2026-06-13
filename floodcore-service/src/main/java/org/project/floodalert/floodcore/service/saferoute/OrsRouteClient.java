@@ -36,7 +36,7 @@ public class OrsRouteClient {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
 
-    public String call(SafeRouteRequest request, List<List<List<Double>>> avoidPolygons) {
+    public String call(SafeRouteRequest request, List<List<List<List<Double>>>> avoidPolygons) {
         OrsRequest orsRequest = buildOrsRequest(request, avoidPolygons);
         logPayloadIfDebug(orsRequest);
 
@@ -84,7 +84,7 @@ public class OrsRouteClient {
         }
     }
 
-    private OrsRequest buildOrsRequest(SafeRouteRequest request, List<List<List<Double>>> avoidPolygons) {
+    private OrsRequest buildOrsRequest(SafeRouteRequest request, List<List<List<List<Double>>>> avoidPolygons) {
         OrsRequest.OrsOptions options = buildOptions(request.getVehicleType(), avoidPolygons);
 
         return OrsRequest.builder()
@@ -95,7 +95,7 @@ public class OrsRouteClient {
                 .build();
     }
 
-    private OrsRequest.OrsOptions buildOptions(VehicleType vehicleType, List<List<List<Double>>> avoidPolygons) {
+    private OrsRequest.OrsOptions buildOptions(VehicleType vehicleType, List<List<List<List<Double>>>> avoidPolygons) {
         boolean hasAvoidPolygons = avoidPolygons != null && !avoidPolygons.isEmpty();
         boolean isMotorbike = VehicleType.MOTORBIKE.equals(vehicleType);
 

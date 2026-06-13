@@ -268,6 +268,12 @@ public class FloodEventPersistenceService {
             existingEvent.setLon(newLon);
             existingEvent.setVoteCount(oldVoteCount + 1);
 
+            // Backfill địa chỉ cho event được tạo (PIONEER) khi báo cáo gốc chưa có địa chỉ
+            if ((existingEvent.getLocationDescription() == null || existingEvent.getLocationDescription().isBlank())
+                    && msg.getAddress() != null && !msg.getAddress().isBlank()) {
+                existingEvent.setLocationDescription(msg.getAddress());
+            }
+
             log.info("[PERSISTENCE][CENTROID] ACTIVE event centroid updated: eventId={}, ({},{}) → ({},{})",
                     existingEventId,
                     String.format("%.6f", oldLat), String.format("%.6f", oldLon),

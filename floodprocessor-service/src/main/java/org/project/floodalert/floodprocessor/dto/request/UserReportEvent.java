@@ -25,4 +25,6 @@ public class UserReportEvent {
     Double lon;
 
     String description;
+
+    String address;
 }

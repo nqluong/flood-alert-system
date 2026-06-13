@@ -15,11 +15,14 @@ public class AvoidPolygonBuilder {
     public static final double POLYGON_OFFSET = 0.001;
 
     /**
-     * Tạo danh sách polygon hình vuông bao quanh các điểm ngập nguy hiểm.
+     * Tạo danh sách polygon hình vuông bao quanh các điểm ngập nguy hiểm,
+     * trả về dưới dạng coordinates của GeoJSON MultiPolygon:
+     * mỗi điểm ngập là một polygon độc lập (gồm 1 ring duy nhất).
      */
-    public static List<List<List<Double>>> build(List<FloodDetail> floods) {
-        List<List<List<Double>>> polygons = floods.stream()
-                .map(flood -> GeoUtils.createSquarePolygon(flood.getLat(), flood.getLon(), POLYGON_OFFSET))
+    public static List<List<List<List<Double>>>> build(List<FloodDetail> floods) {
+        List<List<List<List<Double>>>> polygons = floods.stream()
+                .map(flood -> List.of(
+                        GeoUtils.createSquarePolygon(flood.getLat(), flood.getLon(), POLYGON_OFFSET)))
                 .collect(Collectors.toList());
 
         log.debug("[SafeRouting] Đã tạo {} avoid polygons", polygons.size());

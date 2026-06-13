@@ -54,9 +54,11 @@ public class OrsRequest {
 
         @JsonProperty("type")
         @Builder.Default
-        String type = "Polygon";
+        String type = "MultiPolygon";
 
+        // MultiPolygon coordinates: array of polygons; each polygon is an array of rings;
+        // each ring is an array of [lon, lat] positions.
         @JsonProperty("coordinates")
-        List<List<List<Double>>> coordinates;
+        List<List<List<List<Double>>>> coordinates;
     }
 }

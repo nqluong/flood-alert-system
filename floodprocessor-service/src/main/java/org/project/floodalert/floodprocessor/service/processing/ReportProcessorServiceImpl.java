@@ -344,6 +344,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                 .imageUrl(event.getImageUrl())
                                 .severityLevel(event.getSeverityLevel())
                                 .description(event.getDescription())
+                                .address(event.getAddress())
                                 .build();
         }
 
