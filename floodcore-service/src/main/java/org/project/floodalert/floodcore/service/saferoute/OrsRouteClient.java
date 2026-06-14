@@ -67,6 +67,12 @@ public class OrsRouteClient {
             log.error("[SafeRouting] ORS API bad request (400): {}", e.getResponseBodyAsString());
             throw mapOrsErrorResponse(e.getResponseBodyAsString());
 
+        } catch (HttpClientErrorException e) {
+            // ORS trả mã lỗi routing (vd 2009 "route not found") kèm HTTP 404, không phải
+            // 400/5xx → vẫn cần map riêng để FE nhận đúng lý do thay vì lỗi chung chung.
+            log.error("[SafeRouting] ORS API client error ({}): {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw mapOrsErrorResponse(e.getResponseBodyAsString());
+
         } catch (ResourceAccessException e) {
             log.error("[SafeRouting] ORS API timeout: {}", e.getMessage());
             throw new AppException(CoreErrorCode.EXTERNAL_SERVICE_ERROR);
