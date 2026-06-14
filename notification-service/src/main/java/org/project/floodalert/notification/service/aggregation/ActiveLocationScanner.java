@@ -52,6 +52,7 @@ public class ActiveLocationScanner {
                             new Distance(event.getRadiusMeters() / 1000.0, Metrics.KILOMETERS)),
                     RedisGeoCommands.GeoRadiusCommandArgs.newGeoRadiusArgs()
                             .includeDistance()
+                            .includeCoordinates()
                             .sortAscending()
             );
 
@@ -59,20 +60,20 @@ public class ActiveLocationScanner {
                 return Collections.emptyMap();
             }
 
-            // Parse GEO result thành Map<userId, distance>, dùng LinkedHashMap giữ thứ tự
-            Map<UUID, Double> userDistances = results.getContent().stream()
+            // Parse GEO result thành Map<userId, Entry>, dùng LinkedHashMap giữ thứ tự
+            Map<UUID, Entry> userEntries = results.getContent().stream()
                     .map(this::tryParseGeoResult)
                     .filter(Objects::nonNull)
                     .collect(Collectors.toMap(
                             Entry::userId,
-                            Entry::distance,
+                            e -> e,
                             (a, b) -> a,
                             LinkedHashMap::new));
 
-            if (userDistances.isEmpty()) return Collections.emptyMap();
+            if (userEntries.isEmpty()) return Collections.emptyMap();
 
             // Multi-GET heartbeat (1 roundtrip cho N keys)
-            List<UUID> orderedUserIds = List.copyOf(userDistances.keySet());
+            List<UUID> orderedUserIds = List.copyOf(userEntries.keySet());
             List<String> heartbeatKeys = orderedUserIds.stream()
                     .map(id -> USER_HEARTBEAT_PREFIX + id)
                     .collect(Collectors.toList());
@@ -88,10 +89,13 @@ public class ActiveLocationScanner {
                             orderedUserIds::get,
                             i -> {
                                 UUID userId = orderedUserIds.get(i);
+                                Entry entry = userEntries.get(userId);
                                 return NotificationContext.builder()
                                         .userId(userId)
                                         .isNearActive(true)
-                                        .activeDistance(userDistances.get(userId))
+                                        .activeDistance(entry.distance())
+                                        .activeLat(entry.lat())
+                                        .activeLon(entry.lon())
                                         .build();
                             }));
 
@@ -105,12 +109,15 @@ public class ActiveLocationScanner {
         try {
             UUID userId = UUID.fromString(result.getContent().getName());
             double distanceMeters = result.getDistance().getValue() * 1000.0;
-            return new Entry(userId, distanceMeters);
+            Point point = result.getContent().getPoint();
+            Double lon = point != null ? point.getX() : null;
+            Double lat = point != null ? point.getY() : null;
+            return new Entry(userId, distanceMeters, lat, lon);
         } catch (IllegalArgumentException e) {
             log.warn("[Active] Invalid userId format: {}", result.getContent().getName());
             return null;
         }
     }
 
-    private record Entry(UUID userId, Double distance) {}
+    private record Entry(UUID userId, Double distance, Double lat, Double lon) {}
 }

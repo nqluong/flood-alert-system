@@ -22,6 +22,9 @@ public class NotificationContext {
 
     Double activeDistance;
 
+    Double activeLat;
+    Double activeLon;
+
     @Builder.Default
     List<String> affectedZones = new ArrayList<>();
 

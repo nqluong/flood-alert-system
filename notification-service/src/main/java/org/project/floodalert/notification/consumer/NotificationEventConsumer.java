@@ -180,6 +180,8 @@ public class NotificationEventConsumer {
                 && context.getActiveDistance() > radiusMeters) {
             context.setNearActive(false);
             context.setActiveDistance(null);
+            context.setActiveLat(null);
+            context.setActiveLon(null);
         }
 
         if (context.getZoneDistances() != null && !context.getZoneDistances().isEmpty()) {
@@ -272,6 +274,14 @@ public class NotificationEventConsumer {
             data.put("activeDistance", context.getActiveDistance());
         if (context.getStaticDistance() != null)
             data.put("staticDistance", context.getStaticDistance());
+
+        // Toạ độ vị trí live lúc cảnh báo — chỉ gửi khi vẫn còn near-active (chưa bị
+        // trim ngoài bán kính) để FE vẽ lại "vị trí lịch sử" của user.
+        if (context.isNearActive()
+                && context.getActiveLat() != null && context.getActiveLon() != null) {
+            data.put("activeLat", context.getActiveLat());
+            data.put("activeLon", context.getActiveLon());
+        }
 
         return data;
     }
