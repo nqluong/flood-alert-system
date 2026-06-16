@@ -34,6 +34,12 @@ public class ReputationUpdateEvent {
     /** Report ID gốc gây ra sự thay đổi này */
     String reportId;
 
+    Double lat;
+
+    Double lon;
+
+    String address;
+
     /** Timestamp khi event được tạo */
     @Builder.Default
     LocalDateTime timestamp = LocalDateTime.now();

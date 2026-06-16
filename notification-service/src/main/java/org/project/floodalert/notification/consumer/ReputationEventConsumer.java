@@ -133,6 +133,15 @@ public class ReputationEventConsumer {
         data.put("reason", event.getReason());
         data.put("points", event.getPoints());
         data.put("reportStatus", approved ? "APPROVED" : "REJECTED");
+        if (event.getLat() != null) {
+            data.put("lat", event.getLat());
+        }
+        if (event.getLon() != null) {
+            data.put("lon", event.getLon());
+        }
+        if (event.getAddress() != null && !event.getAddress().isBlank()) {
+            data.put("location", event.getAddress());
+        }
         if (event.getTimestamp() != null) {
             data.put("timestamp", event.getTimestamp().toString());
         }

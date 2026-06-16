@@ -82,7 +82,10 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                     .eventId(eventId)
                     .reason(ReputationReason.ADMIN_APPROVED)
                     .points(rewardPoints)
-                    .reportId(null)
+                    .reportId(contributor.getReportId())
+                    .lat(savedEvent.getLat())
+                    .lon(savedEvent.getLon())
+                    .address(savedEvent.getLocationDescription())
                     .timestamp(LocalDateTime.now())
                     .build();
 
@@ -137,7 +140,10 @@ public class AdminApprovalServiceImpl implements AdminApprovalService {
                     .eventId(eventId)
                     .reason(ReputationReason.ADMIN_REJECTED)
                     .points(REJECTION_PENALTY_POINTS)
-                    .reportId(null)
+                    .reportId(contributor.getReportId())
+                    .lat(savedEvent.getLat())
+                    .lon(savedEvent.getLon())
+                    .address(savedEvent.getLocationDescription())
                     .timestamp(LocalDateTime.now())
                     .build();
 

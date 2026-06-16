@@ -159,7 +159,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         msg.getReportId(), msg.getUserId(), totalScore, POINTS_AUTO_REJECTED);
 
                         publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
-                                        ReputationReason.AUTO_REJECTED, POINTS_AUTO_REJECTED, msg.getReportId());
+                                        ReputationReason.AUTO_REJECTED, POINTS_AUTO_REJECTED, msg.getReportId(), newEvent);
 
                         // Bắn event cập nhật status = REJECTED về flood-core
                         publishReportStatusEvent(msg, STATUS_REJECTED, newEvent.getEventId(),
@@ -179,7 +179,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         msg.getReportId(), msg.getUserId(), POINTS_PIONEER_APPROVED);
 
                         publishReputationEvent(msg.getUserId(), newEvent.getEventId(),
-                                        ReputationReason.CLUSTER_APPROVED, POINTS_PIONEER_APPROVED, msg.getReportId());
+                                        ReputationReason.CLUSTER_APPROVED, POINTS_PIONEER_APPROVED, msg.getReportId(), newEvent);
 
                         publishReportStatusEvent(msg, "APPROVED", newEvent.getEventId(), null, scoringResult);
 
@@ -217,7 +217,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                 msg.getUserId(), existingEventId, POINTS_ACTIVE_CONFIRMATION);
 
                 publishReputationEvent(msg.getUserId(), updatedEvent.getEventId(),
-                                ReputationReason.ACTIVE_CONFIRMATION, POINTS_ACTIVE_CONFIRMATION, msg.getReportId());
+                                ReputationReason.ACTIVE_CONFIRMATION, POINTS_ACTIVE_CONFIRMATION, msg.getReportId(), updatedEvent);
 
                 // Bắn Kafka UPDATED event
                 publishLifecycleEvent(updatedEvent, LifecycleEventType.UPDATED);
@@ -296,7 +296,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                                 contributor.getUserId(), role, points);
 
                                 publishReputationEvent(contributor.getUserId(), updatedEvent.getEventId(),
-                                                ReputationReason.CLUSTER_APPROVED, points, contributor.getReportId());
+                                                ReputationReason.CLUSTER_APPROVED, points, contributor.getReportId(), updatedEvent);
 
                                 publishReportStatusEvent(contributor.getReportId(), contributor.getUserId(),
                                                 "APPROVED", updatedEvent.getEventId(), scoringResult);
@@ -353,7 +353,7 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
          * Non-critical operation - không throw exception để không phá main flow.
          */
         private void publishReputationEvent(UUID userId, String eventId,
-                        ReputationReason reason, int points, String reportId) {
+                        ReputationReason reason, int points, String reportId, FloodEvent floodEvent) {
                 try {
                         ReputationUpdateEvent event = ReputationUpdateEvent.builder()
                                         .userId(userId)
@@ -361,6 +361,9 @@ public class ReportProcessorServiceImpl implements ReportProcessingUseCase {
                                         .reason(reason)
                                         .points(points)
                                         .reportId(reportId)
+                                        .lat(floodEvent != null ? floodEvent.getLat() : null)
+                                        .lon(floodEvent != null ? floodEvent.getLon() : null)
+                                        .address(floodEvent != null ? floodEvent.getLocationDescription() : null)
                                         .build();
 
                         reputationEventPublisher.publish(event);

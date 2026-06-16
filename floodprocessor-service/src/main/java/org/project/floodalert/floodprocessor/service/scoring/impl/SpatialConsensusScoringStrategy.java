@@ -145,7 +145,7 @@ public class SpatialConsensusScoringStrategy implements ReportScoringStrategy {
     }
 
     /**
-     * Bước 2: Tính điểm đồng thuận dựa trên số lượng USER_REPORT active lân cận.
+     * Tính điểm đồng thuận dựa trên số lượng USER_REPORT active lân cận.
      */
     private double evaluateCrowdConsensus(String reportId, double lat, double lon, LocalDateTime since) {
         int count = floodEventRepository.countNearbyActiveUserReports(lat, lon, RADIUS_KM, since);
