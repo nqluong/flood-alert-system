@@ -140,8 +140,8 @@ public class NotificationEventConsumer {
             return false;
         }
 
-        // floodAlerts=false → chỉ cho qua MEDIUM trở lên
-        if (!Boolean.TRUE.equals(effective.getFloodAlerts()) && !isMediumOrAbove(severityLevel)) {
+        // floodAlerts=false → chỉ cho qua mức "ngập cao" (severe)
+        if (!Boolean.TRUE.equals(effective.getFloodAlerts()) && !isSevere(severityLevel)) {
             return false;
         }
 
@@ -201,11 +201,15 @@ public class NotificationEventConsumer {
         };
     }
 
-    private boolean isMediumOrAbove(String severityLevel) {
+    /**
+     * Mức "ngập cao" (severe): HIGH (sơ đồ 3 mức của FE) hoặc DANGER/CRITICAL (sơ đồ IoT cũ).
+     * Dùng khi user tắt floodAlerts — chỉ muốn nhận cảnh báo nghiêm trọng nhất.
+     */
+    private boolean isSevere(String severityLevel) {
         if (severityLevel == null)
             return false;
         return switch (severityLevel.toUpperCase()) {
-            case "MEDIUM", "WARNING", "DANGER", "CRITICAL" -> true;
+            case "HIGH", "DANGER", "CRITICAL" -> true;
             default -> false;
         };
     }
@@ -263,7 +267,11 @@ public class NotificationEventConsumer {
         data.put("lat", event.getLat());
         data.put("lon", event.getLon());
         data.put("severityLevel", translateSeverityToVietnamese(event.getSeverityLevel()));
-        data.put("waterLevel", event.getWaterLevel());
+        // Chỉ gửi waterLevel khi có giá trị — tránh FE hiển thị "Mực nước: -"
+        // cho điểm ngập đã hết/không có số liệu mực nước.
+        if (event.getWaterLevel() != null) {
+            data.put("waterLevel", event.getWaterLevel());
+        }
         data.put("location", event.getLocation());
         data.put("timestamp", event.getTimestamp().toString());
         data.put("isResolved", isResolved);
@@ -289,14 +297,14 @@ public class NotificationEventConsumer {
     private String translateSeverityToVietnamese(String severityLevel) {
         if (severityLevel == null)
             return "Không xác định";
+        // Gom mọi sơ đồ severity (sensor: SAFE/WARNING/DANGER, báo cáo/FE: LOW/MEDIUM/HIGH)
+        // về đúng 3 mức ngập hiển thị trên FE.
         return switch (severityLevel.toUpperCase()) {
-            case "CRITICAL" -> "Cực kỳ nguy hiểm (>50cm)";
-            case "DANGER" -> "Nguy hiểm (20–50cm)";
-            case "WARNING" -> "Cảnh báo";
-            case "MEDIUM" -> "Trung bình (10–20cm)";
-            case "LOW" -> "Nhẹ (5–10cm)";
+            case "HIGH", "DANGER", "CRITICAL" -> "Ngập cao";
+            case "MEDIUM", "WARNING" -> "Ngập trung bình";
+            case "LOW" -> "Ngập nhẹ";
             case "NONE", "SAFE" -> "Không ngập";
-            default -> severityLevel;
+            default -> "Không xác định";
         };
     }
 
@@ -304,8 +312,8 @@ public class NotificationEventConsumer {
         if (severityLevel == null)
             return NotificationPriority.NORMAL;
         return switch (severityLevel.toUpperCase()) {
-            case "CRITICAL", "DANGER" -> NotificationPriority.HIGH;
-            case "WARNING", "MEDIUM" -> NotificationPriority.NORMAL;
+            case "HIGH", "DANGER", "CRITICAL" -> NotificationPriority.HIGH;
+            case "MEDIUM", "WARNING" -> NotificationPriority.NORMAL;
             default -> NotificationPriority.LOW;
         };
     }

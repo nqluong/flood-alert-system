@@ -319,6 +319,15 @@ class NotificationEventConsumerTest {
         }
 
         @Test
+        @DisplayName("HIGH (FE 3-mức) → HIGH priority")
+        void highIsHighPriority() {
+            testEvent.setSeverityLevel("HIGH");
+            consumer.consumeFloodLifecycleEvent(testEvent, acknowledgment);
+            verify(fcmDispatchService).sendBatch(captor.capture());
+            assertThat(captor.getValue().get(0).getPriority()).isEqualTo(NotificationPriority.HIGH);
+        }
+
+        @Test
         @DisplayName("MEDIUM → NORMAL priority")
         void mediumIsNormalPriority() {
             testEvent.setSeverityLevel("MEDIUM");

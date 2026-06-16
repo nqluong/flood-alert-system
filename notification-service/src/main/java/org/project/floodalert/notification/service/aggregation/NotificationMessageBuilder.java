@@ -50,14 +50,14 @@ public class NotificationMessageBuilder {
 
     public String translateSeverity(String severityLevel) {
         if (severityLevel == null) return "Không xác định";
+        // Gom mọi sơ đồ severity (sensor: SAFE/WARNING/DANGER, báo cáo/FE: LOW/MEDIUM/HIGH)
+        // về đúng 3 mức ngập hiển thị trên FE.
         return switch (severityLevel.toUpperCase()) {
-            case "CRITICAL"         -> "Cực kỳ nguy hiểm";
-            case "DANGER"           -> "Nguy hiểm";
-            case "WARNING"          -> "Cảnh báo";
-            case "MEDIUM"           -> "Trung bình";
-            case "LOW"              -> "Nhẹ";
-            case "NONE", "SAFE"     -> "Không ngập";
-            default                 -> severityLevel;
+            case "HIGH", "DANGER", "CRITICAL"   -> "Ngập cao";
+            case "MEDIUM", "WARNING"            -> "Ngập trung bình";
+            case "LOW"                          -> "Ngập nhẹ";
+            case "NONE", "SAFE"                 -> "Không ngập";
+            default                             -> "Không xác định";
         };
     }
 }
