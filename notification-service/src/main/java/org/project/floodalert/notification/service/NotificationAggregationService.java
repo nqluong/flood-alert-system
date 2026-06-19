@@ -91,4 +91,12 @@ public class NotificationAggregationService {
     public String generateResolvedBody(FloodEventDTO event) {
         return messageBuilder.resolvedBody(event);
     }
+
+    public String generateDeEscalatedTitle(FloodEventDTO event) {
+        return messageBuilder.deEscalatedTitle(event);
+    }
+
+    public String generateDeEscalatedBody(FloodEventDTO event) {
+        return messageBuilder.deEscalatedBody(event);
+    }
 }

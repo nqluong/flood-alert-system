@@ -39,8 +39,10 @@ public class NotificationEventConsumer {
     private static final int MAX_RETRIES = 3;
 
     private static final String TYPE_RESOLVED = "RESOLVED";
+    private static final String TYPE_DE_ESCALATED = "DE_ESCALATED";
     private static final String NOTIFICATION_TYPE_FLOOD_ALERT = "FLOOD_ALERT";
     private static final String NOTIFICATION_TYPE_FLOOD_RESOLVED = "FLOOD_RESOLVED";
+    private static final String NOTIFICATION_TYPE_FLOOD_DE_ESCALATED = "FLOOD_DE_ESCALATED";
 
     // Default áp dụng khi user chưa có preference record trong DB
     private static final NotificationPreference DEFAULT_PREFERENCE = NotificationPreference.builder()
@@ -56,9 +58,12 @@ public class NotificationEventConsumer {
     public void consumeFloodLifecycleEvent(FloodLifecycleEvent event, Acknowledgment ack) {
         try {
             boolean isResolved = TYPE_RESOLVED.equalsIgnoreCase(event.getType());
-            log.info("[NotifConsumer] Xử lý event eventId={}, type={}, severity={}, location=({},{})",
+            // Giảm cấp (VD: DANGER → WARNING): điểm ngập vẫn còn nhưng mực nước đã hạ.
+            // Phải thông báo "mực nước giảm", không phải cảnh báo ngập mới.
+            boolean isDeEscalated = TYPE_DE_ESCALATED.equalsIgnoreCase(event.getType());
+            log.info("[NotifConsumer] Xử lý event eventId={}, type={}, severity={}, prevSeverity={}, location=({},{})",
                     event.getEventId(), event.getType(), event.getSeverityLevel(),
-                    event.getLat(), event.getLon());
+                    event.getPreviousSeverityLevel(), event.getLat(), event.getLon());
 
             // Không gửi alert khi severity SAFE/NONE — chỉ cho phép RESOLVED xử lý "hết
             // ngập"
@@ -87,7 +92,7 @@ public class NotificationEventConsumer {
                 return;
             }
 
-            List<Notification> notifications = generateNotifications(filtered, dto, isResolved);
+            List<Notification> notifications = generateNotifications(filtered, dto, isResolved, isDeEscalated);
             int successCount = fcmDispatchService.sendBatch(notifications);
 
             log.info("[NotifConsumer] Hoàn tất eventId={}: {}/{} notifications gửi thành công",
@@ -106,6 +111,7 @@ public class NotificationEventConsumer {
                 .lon(event.getLon())
                 .radiusMeters(MAX_SCAN_RADIUS_METERS)
                 .severityLevel(event.getSeverityLevel())
+                .previousSeverityLevel(event.getPreviousSeverityLevel())
                 .waterLevel(event.getWaterLevel())
                 .location(event.getLocation())
                 .timestamp(event.getTimestamp())
@@ -231,27 +237,42 @@ public class NotificationEventConsumer {
 
     private List<Notification> generateNotifications(Map<UUID, NotificationContext> contexts,
             FloodEventDTO event,
-            boolean isResolved) {
+            boolean isResolved,
+            boolean isDeEscalated) {
         return contexts.values().stream()
-                .map(context -> buildNotification(context, event, isResolved))
+                .map(context -> buildNotification(context, event, isResolved, isDeEscalated))
                 .collect(Collectors.toList());
     }
 
-    private Notification buildNotification(NotificationContext context, FloodEventDTO event, boolean isResolved) {
-        String title = isResolved
-                ? aggregationService.generateResolvedTitle()
-                : aggregationService.generateNotificationTitle(event);
-        String body = isResolved
-                ? aggregationService.generateResolvedBody(event)
-                : aggregationService.generateNotificationBody(event);
+    private Notification buildNotification(NotificationContext context, FloodEventDTO event,
+            boolean isResolved, boolean isDeEscalated) {
+        String title;
+        String body;
+        String notificationType;
+        if (isResolved) {
+            title = aggregationService.generateResolvedTitle();
+            body = aggregationService.generateResolvedBody(event);
+            notificationType = NOTIFICATION_TYPE_FLOOD_RESOLVED;
+        } else if (isDeEscalated) {
+            title = aggregationService.generateDeEscalatedTitle(event);
+            body = aggregationService.generateDeEscalatedBody(event);
+            notificationType = NOTIFICATION_TYPE_FLOOD_DE_ESCALATED;
+        } else {
+            title = aggregationService.generateNotificationTitle(event);
+            body = aggregationService.generateNotificationBody(event);
+            notificationType = NOTIFICATION_TYPE_FLOOD_ALERT;
+        }
 
         return Notification.builder()
                 .userId(context.getUserId())
                 .title(title)
                 .body(body)
-                .notificationType(isResolved ? NOTIFICATION_TYPE_FLOOD_RESOLVED : NOTIFICATION_TYPE_FLOOD_ALERT)
-                .priority(isResolved ? NotificationPriority.NORMAL : determinePriority(event.getSeverityLevel()))
-                .data(buildNotificationData(event, context, isResolved))
+                .notificationType(notificationType)
+                // Giảm cấp/hết ngập là tin "tốt" nên ưu tiên NORMAL; còn lại theo severity mới
+                .priority((isResolved || isDeEscalated)
+                        ? NotificationPriority.NORMAL
+                        : determinePriority(event.getSeverityLevel()))
+                .data(buildNotificationData(event, context, isResolved, isDeEscalated))
                 .channel(NotificationChannel.PUSH)
                 .fcmToken(null)
                 .status(NotificationStatus.PENDING)
@@ -261,12 +282,16 @@ public class NotificationEventConsumer {
     }
 
     private Map<String, Object> buildNotificationData(FloodEventDTO event, NotificationContext context,
-            boolean isResolved) {
+            boolean isResolved, boolean isDeEscalated) {
         Map<String, Object> data = new HashMap<>();
         data.put("eventId", event.getEventId());
         data.put("lat", event.getLat());
         data.put("lon", event.getLon());
         data.put("severityLevel", translateSeverityToVietnamese(event.getSeverityLevel()));
+        // Severity trước thay đổi — để FE hiển thị "giảm từ X về Y" ở thông báo giảm cấp.
+        if (event.getPreviousSeverityLevel() != null) {
+            data.put("previousSeverityLevel", translateSeverityToVietnamese(event.getPreviousSeverityLevel()));
+        }
         // Chỉ gửi waterLevel khi có giá trị — tránh FE hiển thị "Mực nước: -"
         // cho điểm ngập đã hết/không có số liệu mực nước.
         if (event.getWaterLevel() != null) {
@@ -275,6 +300,7 @@ public class NotificationEventConsumer {
         data.put("location", event.getLocation());
         data.put("timestamp", event.getTimestamp().toString());
         data.put("isResolved", isResolved);
+        data.put("isDeEscalated", isDeEscalated);
         data.put("isNearActive", context.isNearActive());
         data.put("affectedZones", String.join(", ", context.getAffectedZones()));
 

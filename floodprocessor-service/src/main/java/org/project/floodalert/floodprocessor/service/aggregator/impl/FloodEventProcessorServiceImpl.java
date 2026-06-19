@@ -49,7 +49,7 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
                 ProcessedSensorData data = dataList.get(i);
 
                 if (result.shouldPublish() && result.floodEvent() != null) {
-                    eventsToPublish.add(buildLifecycleEvent(result.floodEvent(), result));
+                    eventsToPublish.add(buildLifecycleEvent(result.floodEvent(), result, data));
                 }
 
                 log.debug("Hoàn thành xử lý aggregator cho sensor [{}], sự kiện [{}], type [{}]",
@@ -73,13 +73,16 @@ public class FloodEventProcessorServiceImpl implements FloodEventProcessorServic
     }
 
     private FloodLifecycleEvent buildLifecycleEvent(FloodEvent floodEvent,
-                                                     FloodEventDbResult dbResult) {
+                                                     FloodEventDbResult dbResult,
+                                                     ProcessedSensorData data) {
         return FloodLifecycleEvent.builder()
                 .eventId(floodEvent.getEventId())
                 .type(dbResult.lifecycleEventType())
                 // Dùng snapshot được capture tại thời điểm tạo result, tránh bị ghi đè bởi message kế tiếp trong batch
                 .waterLevel(dbResult.waterLevelSnapshot())
                 .severityLevel(dbResult.severityLevelSnapshot())
+                // Severity trước thay đổi (để consumer hiển thị "giảm từ X về Y") — null nếu chưa có lịch sử
+                .previousSeverityLevel(data.getPreviousStatus() != null ? data.getPreviousStatus().name() : null)
                 .location(floodEvent.getLocationDescription())
                 .lat(floodEvent.getLat())
                 .lon(floodEvent.getLon())

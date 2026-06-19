@@ -29,6 +29,10 @@ public class FloodLifecycleEvent {
     /** Mức độ cảnh báo dạng chuỗi: SAFE, WARNING, DANGER */
     String severityLevel;
 
+    /** Mức độ cảnh báo TRƯỚC khi xảy ra thay đổi (dùng cho ESCALATED/DE_ESCALATED).
+     *  Cho phép consumer hiển thị "mực nước giảm từ X về Y". Null nếu không xác định. */
+    String previousSeverityLevel;
+
     /** Mô tả địa điểm ngập */
     String location;
 

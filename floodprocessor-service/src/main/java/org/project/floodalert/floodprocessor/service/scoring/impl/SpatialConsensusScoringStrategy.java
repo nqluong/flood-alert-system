@@ -28,7 +28,6 @@ import java.util.List;
  *       và cho điểm theo thang: 0->0.0 | 1->50.0 | 2->80.0 | ≥3->100.0</li>
  * </ol>
  *
- * <p>Trọng số tối đa: <b>20 điểm</b> trong tổng điểm scoring (engine scale lại).</p>
  */
 @Slf4j
 @Component

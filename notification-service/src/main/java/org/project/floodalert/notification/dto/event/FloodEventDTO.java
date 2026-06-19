@@ -41,6 +41,12 @@ public class FloodEventDTO {
      * Mức độ nghiêm trọng
      */
     String severityLevel;
+
+    /**
+     * Mức độ nghiêm trọng TRƯỚC thay đổi (dùng cho thông báo giảm/tăng cấp).
+     * Null nếu không xác định.
+     */
+    String previousSeverityLevel;
     
     /**
      * Mức nước (cm)

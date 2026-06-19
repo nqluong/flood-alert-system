@@ -32,6 +32,38 @@ public class NotificationMessageBuilder {
         return "Khu vực đã hết ngập";
     }
 
+    public String deEscalatedTitle(FloodEventDTO event) {
+        return String.format("Mực nước đang giảm tại %s", resolveLocation(event));
+    }
+
+    /**
+     * Thông báo giảm cấp: điểm ngập VẪN còn nhưng mực nước đã hạ.
+     * Nếu biết mức trước đó → nêu rõ "giảm từ {trước} về {hiện tại}",
+     * nếu không → chỉ nói "đang giảm, hiện ở mức {hiện tại}".
+     */
+    public String deEscalatedBody(FloodEventDTO event) {
+        String location = resolveLocation(event);
+        String currentVi = translateSeverity(event.getSeverityLevel());
+        String previousVi = (event.getPreviousSeverityLevel() != null && !event.getPreviousSeverityLevel().isBlank())
+                ? translateSeverity(event.getPreviousSeverityLevel())
+                : null;
+        // Chỉ nêu "từ X" khi mức trước khác mức hiện tại (tránh "giảm từ X xuống X")
+        boolean hasDistinctPrevious = previousVi != null && !previousVi.equals(currentVi);
+
+        String levelPart = hasDistinctPrevious
+                ? String.format("đã giảm từ %s xuống %s", previousVi, currentVi)
+                : String.format("đang giảm, hiện ở mức %s", currentVi);
+
+        if (event.getWaterLevel() != null) {
+            return String.format(
+                    "Mực nước tại %s %s (khoảng %.0fcm). Khu vực vẫn còn ngập, hãy tiếp tục chú ý an toàn!",
+                    location, levelPart, event.getWaterLevel());
+        }
+        return String.format(
+                "Mực nước tại %s %s. Khu vực vẫn còn ngập, hãy tiếp tục chú ý an toàn!",
+                location, levelPart);
+    }
+
     public String resolvedBody(FloodEventDTO event) {
         return String.format(
                 "Tin vui: Điểm ngập tại %s đã hết ngập. Bạn có thể di chuyển bình thường.",

@@ -20,6 +20,7 @@ public class FloodLifecycleEvent {
     String type;
     Double waterLevel;
     String severityLevel;
+    String previousSeverityLevel;
     String location;
     Double lat;
     Double lon;
