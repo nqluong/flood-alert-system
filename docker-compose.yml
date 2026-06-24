@@ -12,9 +12,6 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/certbot/conf:/etc/letsencrypt:ro
       - ./nginx/certbot/www:/var/www/certbot:ro
-    depends_on:
-      api-gateway:
-        condition: service_healthy
     networks:
       - flood-network
     deploy:
@@ -44,7 +41,7 @@ services:
       - flood-network
 
   api-gateway:
-    image: nqluong14/api-gateway:v1.0
+    image: nqluong14/api-gateway:v2.0
     container_name: api-gateway
     restart: unless-stopped
     env_file:
@@ -62,12 +59,6 @@ services:
         condition: service_healthy
       ingestion-service:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 60s
     deploy:
       resources:
         limits:
@@ -83,7 +74,7 @@ services:
         max-file: "3"
 
   auth-service:
-    image: nqluong14/auth-service:v1.2
+    image: nqluong14/auth-service:v2.0
     container_name: auth-service
     restart: unless-stopped
     # ports:
@@ -113,7 +104,7 @@ services:
           memory: 384M
 
   floodcore-service:
-    image: nqluong14/floodcore-service:v1.1
+    image: nqluong14/floodcore-service:v2.0
     container_name: floodcore-service
     restart: unless-stopped
     # ports:
@@ -125,6 +116,7 @@ services:
       - ./logs/floodcore:/app/logs
     environment:
       - TZ=Asia/Ho_Chi_Minh
+      - LOGGING_LEVEL_ROOT=INFO
       - FIREBASE_CONFIG_PATH=file:/app/secrets/firebase-key.json
     networks:
       - flood-network
@@ -144,7 +136,7 @@ services:
           memory: 768M
 
   floodprocessor-service:
-    image: nqluong14/floodprocessor-service:v1.1
+    image: nqluong14/floodprocessor-service:v2.0
     container_name: floodprocessor-service
     restart: unless-stopped
     # ports:
@@ -153,6 +145,7 @@ services:
       - ./floodprocessor-service/.env
     environment:
       - TZ=Asia/Ho_Chi_Minh
+      - LOGGING_LEVEL_ROOT=INFO
     networks:
       - flood-network
     deploy:
@@ -165,7 +158,7 @@ services:
           memory: 1024M
 
   notification-service:
-    image: nqluong14/notification-service:v1.2
+    image: nqluong14/notification-service:v2.0
     container_name: notification-service
     restart: unless-stopped
     # ports:
@@ -177,6 +170,7 @@ services:
     environment:
       - TZ=Asia/Ho_Chi_Minh
       - FIREBASE_CONFIG_PATH=file:/app/secrets/firebase-key.json
+      # - LOGGING_LEVEL_ORG_PROJECT_FLOODALERT_NOTIFICATION=DEBUG
     networks:
       - flood-network
     healthcheck:
@@ -195,7 +189,7 @@ services:
           memory: 512M
 
   ingestion-service:
-    image: nqluong14/ingestion-service:v1.2
+    image: nqluong14/ingestion-service:v2.0
     container_name: ingestion-service
     restart: unless-stopped
     # ports:
