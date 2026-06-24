@@ -307,7 +307,7 @@ services:
     command: [
       "redis-server",
       "--appendonly", "yes",
-      "--requirepass", "NguyenLuong1405",
+      "--requirepass", "123456",
       "--maxmemory", "512mb",
       "--maxmemory-policy", "allkeys-lru",
       "--save", "900 1",
@@ -338,7 +338,7 @@ services:
       - "5432:5432"
     environment:
       POSTGRES_USER: floodalert
-      POSTGRES_PASSWORD: "@NguyenLuong1405"
+      POSTGRES_PASSWORD: "123456"
       POSTGRES_DB: flood_alert_db
       PGDATA: /var/lib/postgresql/data/pgdata
     command: >

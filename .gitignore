@@ -37,6 +37,6 @@ build/
 
 ### Mac OS ###
 .DS_Store
-local.env
+*.env
 deloy.env
 *.json
